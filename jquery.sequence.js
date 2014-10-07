@@ -22,8 +22,7 @@
         this.lastPromise = firstDeferred.promise();
         if ($.isArray(actions)) {
             $.each(actions, function (i, action) {
-                self.push(
-                $.isFunction(action) ? action : action.action, action.fallback);
+                self.push($.isFunction(action) ? action : action.action, action.fallback);
             });
         } else if (actions !== undefined) {
             throw new Error('actions (if passed) must be an array');
@@ -56,8 +55,6 @@
         });
     };
 
-
-
     SequenceCons.prototype.setTimeout = function (handler, duration) {
         var timeoutDfr = $.Deferred();
         var timeoutFired = false;
@@ -65,41 +62,59 @@
             timeoutFired = true;
             handler(timeoutDfr);
         }, duration);
-        
-        var pipeDfr = function (resolve) {
-            return function(deferred) {
+        var oldPromise = this.lastPromise;
+        this.lastPromise = timeoutDfr.promise();
+        var pipeDfr = function (method) {
+            return function () {
                 if (!timeoutFired) {
                     window.clearTimeout(id);
-                    if (resolve){
-                        timeoutDfr.resolveWith(this, shiftArgs(arguments));
-                    } else {
-                        timeoutDfr.rejectWith(this, shiftArgs(arguments));
-                    }
+                    method(this, arguments);
                 }
             };
         };
-        this.push(pipeDfr(true), pipeDfr(false));
-        this.lastPromise = timeoutDfr.promise();
+        oldPromise.then(pipeDfr(timeoutDfr.resolveWith), pipeDfr(timeoutDfr.rejectWith));
+    };
+
+    SequenceCons.prototype.promise = function () {
+        return this.lastPromise;
+    };
+
+    SequenceCons.prototype.whenEmpty = function (action, fallback) {
+        var currentPromise = this.lastPromise();
+        var self = this;
+        var pipeActions = function (func) {
+            return function () {
+                if (self.lastPromise === currentPromise) {
+                    func.apply(this, arguments);
+                } else {
+                    currentPromise = self.lastPromise;
+                    currentPromise.then(
+                    pipeActions(action), pipeActions(fallback));
+                }
+            };
+        };
+        currentPromise.then(pipeActions(action), pipeActions(fallback));
     };
 
     SequenceCons.prototype.push = function (action, fallback) {
         var nextDeferred = $.Deferred();
-        this.lastPromise.done(function () {
+        var oldPromise = this.lastPromise;
+        this.lastPromise = nextDeferred.promise();
+        oldPromise.done(function () {
             var result = action.apply(this, unshiftArgs(arguments, nextDeferred));
             if (result && $.isFunction(result.then)) {
                 nextDeferred = result.promise ? result.promise() : result;
             }
         });
         if (fallback) {
-            this.lastPromise.fail(function () {
+            oldPromise.fail(function () {
                 fallback.apply(this, unshiftArgs(arguments, nextDeferred));
             });
         } else {
-            this.lastPromise.fail(function () {
+            oldPromise.fail(function () {
                 nextDeferred.rejectWith(this, arguments);
             });
         }
-        this.lastPromise = nextDeferred.promise();
         return this.lastPromise;
     };
 }(jQuery));
