@@ -1,5 +1,5 @@
+"use strict";
 (function ($) {
-    "use strict";
     $.Sequence = function (actions) {
         return new SequenceCons(actions);
     };
