@@ -226,7 +226,7 @@
      * the timeout expires the next action will be executed and the timeout 
      * handler will never be called.
      * @param  {Function} handler  Action to execute if the timeout expires
-     *                             (handler(deferred, [args,]) : result) 
+     *                             (handler(deferred) : result) 
      *                             @see Sequence.push() action parameter
      * @param  {Int} duration      Milliseconds to wait before triggering 
      *                             the timeout handler
@@ -255,15 +255,6 @@
     };
 
     /**
-     * Returns the promise that will be resolved by the last action currently 
-     * in the sequence.
-     * @return {Promise} promise of the last action in the sequence
-     */
-    SequenceCons.prototype.promise = function () {
-        return this.lastPromise;
-    };
-
-    /**
      * Adds an action that will be executed when the sequence has no 
      * more actions to execute. If actions are added after whenEmpty action 
      * is added but before it is executed they will be executed before.
@@ -285,7 +276,7 @@
                 if (self.lastPromise === currentPromise) {
                     var nextDeferred = $.Deferred();
                     self.lastPromise = nextDeferred.promise();
-                    var result = func.apply(this, arguments);
+                    var result = func.apply(this, unshiftArgs(arguments, nextDeferred));
                     pipeResolve(result, nextDeferred);
                 } else {
                     currentPromise = self.lastPromise;
@@ -297,9 +288,19 @@
         return this;
     };
 
+    /**
+     * Returns the promise that will be resolved by the last action currently 
+     * in the sequence.
+     * @return {Promise} promise of the last action in the sequence
+     */
+    SequenceCons.prototype.promise = function () {
+        return this.lastPromise;
+    };
+    
     /*
      * Basic demostration if the sequence
-     */ 
+     */
+    
     $.Sequence([function (deferred) {
         console.log('first');
         deferred.reject('Help me, Third Kenobi. You\'re my only hope');
@@ -521,6 +522,7 @@
         }, {
             whenEmpty: function (deferred) {
                 order = true;
+                deferred.resolve();
             }
         }, function () {
             assert.ok(order, 'after when empty');
