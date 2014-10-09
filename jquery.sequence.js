@@ -4,31 +4,33 @@
      * Abstracts a sequence of a asynchronous actions, the order of execution of the 
      * different actions is enforced using deferred objects.
      * The successful completion of an action will trigger the start of the next one.
-     * If an action fails the following actions will fail too until an action with fallback is found in the queue
-     * (the fallback action will be called then).
+     * If an action fails the following actions will fail too until an action with
+     * fallback is found in the queue (the fallback action will be called then).
      *
-     * Actions consist of a function that receives a Deferred object as its first parameter and the result
-     * of the previous action as the following parameters.
+     * Actions consist of a function that receives a Deferred object as its first 
+     * parameter and the result of the previous action as the following parameters.
      * 
-     * Actions are pushed using the available methods or using an array when the sequence
-     * is created.
-     * For every push feature there is an object syntax using properties and a method and parameters syntax.
-     * Additional features include pushing promises, setting timeouts for the sequence to reach a point and
-     * executing actions when the queue is empty.
+     * Actions are pushed using the available methods or using an array when 
+     * the sequence is created.
+     * For every push feature there is an object syntax using properties and a 
+     * method and parameters syntax. Additional features include pushing promises, 
+     * setting timeouts for the sequence to reach a point and executing actions 
+     * when the queue is empty.
      * 
-     * @param {array[Object|function]} actions An array with the inital actions to execute in the secuence using
-     *                                         object syntax:
-     *                                             Function: action to execute. The sequence will continue when it resolves
-     *                                                 its Deferred object.
-     *                                             {action, fallback}: action and fallback in case of failure of the
-     *                                                 previous action.
-     *                                             {promise}: promise that will stop the secuence untils it's completed
-     *                                             {synchronous}: action executed synchronously without the need to resolve
-     *                                                 the deferred object.
-     *                                             {timeout, duration}: action to execute if the Sequence has not reached that point
-     *                                                 after duration.
-     *                                             {whenEmpty, fallback}: action to execute when the sequence has no pending actions
-     *                                                 to execute.
+     * @param {array[Object|function]} actions An array with the inital actions to 
+     *     execute in the secuence using
+     *     object syntax:
+     *         Function: action to execute. The sequence will continue when it resolves
+     *             its Deferred object.
+     *         {action, fallback}: action and fallback in case of failure of the
+     *             previous action.
+     *         {promise}: promise that will stop the secuence untils it's completed
+     *         {synchronous}: action executed synchronously without the need to resolve
+     *             the deferred object.
+     *         {timeout, duration}: action to execute if the Sequence has not 
+     *             reached that point after duration.
+     *         {whenEmpty, fallback}: action to execute when the sequence has no
+     *             pending actionsto execute.
      */
     $.Sequence = function (actions) {
         return new SequenceCons(actions);
@@ -120,27 +122,27 @@
 
 
     /**
-     * Main method to add actions to the sequence pushes actions at the end of the sequence that
-     * will be executed when all the previous ones are resolved.
+     * Main method to add actions to the sequence pushes actions at the end of 
+     * the sequence that will be executed when all the previous ones are resolved.
      * The fallback method is called if the previous action failed.
      * @param  {Function} action   Action to execute
-     *                             (action(deferred, [args,]) : result) 
-     *                             deferred: Deferred object that will trigger the next action if 
-     *                             completed succesfully or call the next fallback if rejected. The 
-     *                             arguments passed when resolved will be passed to the next action or
-     *                             fallback.
-     *                             args: optional arguments sent by the previous action.
-     *                             result: optional Deferred that will resolve the action instead of the 
-     *                             parameter deferred
+     *         (action(deferred, [args,]) : result) 
+     *         deferred: Deferred object that will trigger the next action if 
+     *         completed succesfully or call the next fallback if rejected. The 
+     *         arguments passed when resolved will be passed to the next action or
+     *         fallback.
+     *         args: optional arguments sent by the previous action.
+     *         result: optional Deferred that will resolve the action instead of the 
+     *         parameter deferred
      * @param  {Function} fallback Action to execute if the last action failed
-     *                             (fallback(deferred, [args,]) : result) 
-     *                             deferred: Deferred object that will trigger the next action if 
-     *                             completed succesfully or call the next fallback if rejected. The 
-     *                             arguments passed when resolved will be passed to the next action or
-     *                             fallback.
-     *                             args: optional arguments sent by the previous action.
-     *                             result: optional Deferred that will resolve the action instead of the 
-     *                             parameter deferred
+     *         (fallback(deferred, [args,]) : result) 
+     *         deferred: Deferred object that will trigger the next action if 
+     *         completed succesfully or call the next fallback if rejected. The 
+     *         arguments passed when resolved will be passed to the next action or
+     *         fallback.
+     *         args: optional arguments sent by the previous action.
+     *         result: optional Deferred that will resolve the action instead of the 
+     *         parameter deferred
      * @return {Sequence}          current instance to allow chaining
      */
     SequenceCons.prototype.push = function (action, fallback) {
@@ -199,14 +201,14 @@
      * as soon as the function exits.
      * Synchronous actions cannot stop the execution of the next action.
      * @param  {Function} action   Action to execute if the previous one completes
-     *                             successfully.
-     *                             (action([args,]) : result) 
-     *                             args: optional arguments sent by the previous action.
-     *                             result: optional return value sent to the next action
+     *         successfully.
+     *         (action([args,]) : result) 
+     *         args: optional arguments sent by the previous action.
+     *         result: optional return value sent to the next action
      * @param  {Function} fallback Action to execute if the previous one fails.
-     *                             (fallback([args,]) : result) 
-     *                             args: optional arguments sent by the previous actions.
-     *                             result: optional return value sent to the next action
+     *         (fallback([args,]) : result) 
+     *         args: optional arguments sent by the previous actions.
+     *         result: optional return value sent to the next action
      * @return {Sequence}          current instance to allow chaining
      */
     SequenceCons.prototype.pushSynchronous = function (action, fallback) {
@@ -218,14 +220,16 @@
     };
 
     /**
-     * Sets a timeout at the current position in the sequence if the timeout expires before
-     * the previous action completes the handler will be fired as if it were a regular action.
-     * If the previous action completes before the timeout expires the next action will be executed
-     * and the timeout handler will never be called.
+     * Sets a timeout at the current position in the sequence if the timeout 
+     * expires before the previous action completes the handler will be fired 
+     * as if it were a regular action. If the previous action completes before 
+     * the timeout expires the next action will be executed and the timeout 
+     * handler will never be called.
      * @param  {Function} handler  Action to execute if the timeout expires
      *                             (handler(deferred, [args,]) : result) 
      *                             @see Sequence.push() action parameter
-     * @param  {Int} duration      Milliseconds to wait before triggering the timeout handler
+     * @param  {Int} duration      Milliseconds to wait before triggering 
+     *                             the timeout handler
      * @return {Sequence}          current instance to allow chaining
      */
     SequenceCons.prototype.setTimeout = function (handler, duration) {
@@ -251,7 +255,8 @@
     };
 
     /**
-     * Returns the promise that will be resolved by the last action currently in the sequence.
+     * Returns the promise that will be resolved by the last action currently 
+     * in the sequence.
      * @return {Promise} promise of the last action in the sequence
      */
     SequenceCons.prototype.promise = function () {
@@ -259,11 +264,11 @@
     };
 
     /**
-     * [broken] Adds an action that will be executed when the sequence has no more actions to execute.
-     * If actions are added after whenEmpty action is added but before it is executed they will 
-     * be executed before.
-     * whenEmpty action will be executed at most once (if actions keep being added or are not
-     * resolved it can starve)
+     * Adds an action that will be executed when the sequence has no 
+     * more actions to execute. If actions are added after whenEmpty action 
+     * is added but before it is executed they will be executed before.
+     * whenEmpty action will be executed at most once (if actions keep being 
+     * added or are not resolved it can starve)
      * @param  {Function} action   Action to execute if the last action succeed
      *                             (action(deferred, [args,]) : result) 
      *                             @see Sequence.push() action parameter
@@ -278,7 +283,10 @@
         var pipeActions = function (func) {
             return function () {
                 if (self.lastPromise === currentPromise) {
+                    var nextDeferred = $.Deferred();
+                    self.lastPromise = nextDeferred.promise();
                     var result = func.apply(this, arguments);
+                    pipeResolve(result, nextDeferred);
                 } else {
                     currentPromise = self.lastPromise;
                     currentPromise.then(pipeActions(action), pipeActions(fallback));
@@ -516,6 +524,21 @@
             }
         }, function () {
             assert.ok(order, 'after when empty');
+            QUnit.start();
+        }]);
+    });
+
+    QUnit.asyncTest("when empty action return", function (assert) {
+        expect(1);
+        $.Sequence([{ whenEmpty: function (deferred) {
+                var dfr = $.Deferred();
+                window.setTimeout(function () {
+                    dfr.resolve();
+                }, 20);
+                return dfr;
+            }
+        }, function () {
+            assert.ok(true, 'after when empty');
             QUnit.start();
         }]);
     });
