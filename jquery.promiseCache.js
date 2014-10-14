@@ -3,87 +3,115 @@
 	$.PromiseCache = function (promises, options) {
 		return new PromiseCacheCons(promises, options);
 	};
+    
+    var Lru = (function(){
+        var LruCons = function(){
+            this.counter = 0;
+        };
 
-	var Lru = function(){
-		this.maxCount = 0;
-	};
+        LruCons.prototype.set = function(cache, key, promise){
+            promise.lru = 0;
+        };
+    
+        LruCons.prototype.get = function(cache, key, promise){
+            this.counter += 1;
+            promise.lru = this.counter;
+        };
 
-	Lru.prototype.set = function(cache, key, promise){
-		promise.lru = 0;
-	};
+        LruCons.prototype.evict = function(nEvicted){
+            var self = this;
+            var limit;
+            if (cache.promises[0]){
+                limit = cache.promises[0].promise.lru -1;
+            }
+            var evicted = [];
+            $.each(cache.promises, function(key, promise) {
+                if (limit > promise.lru){
+                    var i = 1;
+                    while (!evicted[i] || evicted[i].lru > promise.lru){
+                        evicted[i-1] = evicted[i];
+                        i += 1;
+                    }
+                    limit = evicted[0].lru;
+                    evicted[i] = {lru: promise.lru, lruKey: key};
+                }
+                promise.lru -= self.counter;
+            });
+            $.each(evicted, function(key, obj) {
+                cache.remove(obj.lruKey);
+            });
+        };
+        return LruCons;
+    })();
 
-	Lru.prototype.get = function(cache, key, promise){
-		this.maxCount = this.maxCount;
-		promise.lru = this.maxCount;
-	};
+	var Mru = (function(){
+        var MruCons = function(){
+            this.counter = 0;
+        };
 
-	Lru.prototype.evict = function(){
-		var self = this;
-		var minCount = 0;
-		var lruKey = null;
-		$.each(cache.promises, function(key, promise) {
-			if (minCount > promise.lru) {
-				lruKey = key;
-				minCount = promise.lru;
-			}
-			promise.mru -= self.maxCount;
-		});
-		this.maxCount = 0;
-		cache.remove(lruKey);
-	};
+        MruCons.prototype.set = function(cache, key, promise){
+            promise.mru = 0;
+        };
+    
+        MruCons.prototype.get = function(cache, key, promise){
+            this.counter += 1;
+            promise.mru = this.counter;
+        };
 
-	var Mru = function(){
-		this.maxCount = 0;
-	};
-
-	Mru.prototype.set = function(cache, key, promise){
-		promise.mru = 0;
-	};
-
-	Mru.prototype.get = function(cache, key, promise){
-		this.maxCount += 1;
-		promise.mru = this.maxCount;
-	};
-
-	Mru.prototype.evict = function(){
-		var self = this;
-		var maxCount = 0;
-		var mruKey = null;
-		$.each(cache.promises, function(key, promise) {
-			if (maxCount < promise.mru) {
-				mruKey = key;
-				maxCount = promise.mru;
-			}
-			promise.mru -= self.maxCount;
-		});
-		this.maxCount = 0;
-		cache.remove(mruKey);
-	};
-
-	var Lfu = function(){
-	};
-
-	Lfu.prototype.set = function(cache, key, promise){
-		promise.lfu = 0;
-	};
-
-	Lfu.prototype.get = function(cache, key, promise){
-		promise.lfu += 1;
-	};
-
-	Lfu.prototype.evict = function(){
-		var self = this;
-		var minCount = 0;
-		var lfuKey = null;
-		$.each(cache.promises, function(key, promise) {
-			if (minCount > promise.lfu) {
-				lfuKey = key;
-				maxCount = promise.lfu;
-			}
-			promise.lfu -= 1;
-		});
-		cache.remove(lfuKey);
-	};
+        MruCons.prototype.evict = function(nEvicted){
+            var self = this;
+            var limit;
+            if (cache.promises[0]){
+                limit = cache.promises[0].promise.mru -1;
+            }
+            var evicted = [];
+            $.each(cache.promises, function(key, promise) {
+                if (limit < promise.mru){
+                    var i = 1;
+                    while (!evicted[i] || evicted[i].mru < promise.mru){
+                        evicted[i-1] = evicted[i];
+                        i += 1;
+                    }
+                    limit = evicted[0].mru;
+                    evicted[i] = {mru: promise.mru, mruKey: key};
+                }
+                promise.mru -= self.counter;
+            });
+            $.each(evicted, function(key, obj) {
+                cache.remove(obj.mruKey);
+            });
+            self.counter = 0;
+        };
+        return MruCons;
+    })();
+    
+    var Lfu = (function(){
+        
+        var LfuCons = function(){};
+    
+        LfuCons.prototype.set = function(cache, key, promise){
+            promise.lfu = 0;
+        };
+    
+        LfuCons.prototype.get = function(cache, key, promise){
+            promise.lfu += 1;
+        };
+    
+        LfuCons.prototype.evict = function(nEvicted){
+            var self = this;
+            var minCount = 0;
+            var lfuKey = null;
+            $.each(cache.promises, function(key, promise) {
+                if (minCount > promise.lfu) {
+                    lfuKey = key;
+                    maxCount = promise.lfu;
+                }
+                promise.lfu -= 1;
+            });
+            cache.remove(lfuKey);
+        };
+        return LfuCons;
+    })();
 
 	var algorithms = {
 		lru: Lru, 
@@ -98,6 +126,7 @@
 		this.capacity = options.capacity;
 		this.length = 0;
 		this.discarded = options.discarded;
+        this.evictRate = options.evictRate || 1;
 		var eviction;
 		
 		if (options.eviction){
@@ -136,7 +165,7 @@
 		eviction.set(this, key, promise, options);
 		this.length += 1;
 		if (this.capacity < this.length) {
-			this.evict();
+			this.evict(this.evictRate);
 		}
 		if (options.fail){
 			var dfr = $.Deferred();
@@ -191,7 +220,7 @@
 		return cleanCopy;
 	};
 
-	PromiseCacheCons.prototype.evict = function(){
-		this.eviction.evict(this);
+	PromiseCacheCons.prototype.evict = function(nEvicted){
+		this.eviction.evict(this, nEvicted);
 	};
 }(jQuery));
