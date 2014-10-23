@@ -131,17 +131,13 @@
     var PromiseCacheCons = function (promises, options) {
         options = options || {};
         this._promises = {};
-        this.expireTime = options.expireTime;
-        this.capacity = options.capacity;
         this.length = 0;
-        this.discarded = options.discarded;
-        this.evictRate = options.evictRate || 1;
+
         var eviction;
         if (options.eviction) {
             if (algorithms[options.eviction]) {
                 eviction = new algorithms[options.eviction]();
-            }
-            if (!eviction && options.eviction) {
+            } else {
                 eviction = options.eviction;
             }
         }
@@ -150,13 +146,18 @@
         eviction.get = eviction.get || noop;
         eviction.set = eviction.set || noop;
         eviction.remove = eviction.remove || noop;
-        if (this.capacity === undefined) {
-            eviction.evict = noop;
+        if (options.capacity === undefined) {
+            eviction.evict = eviction.evict || noop;
         } else if (!eviction.evict) {
-            throw new Error('There capacity but no evict function set');
+            throw new Error('There is a capacity but no evict function set');
         }
         this.eviction = eviction;
         this.eviction.init(this, promises, options);
+        this.capacity = options.capacity;
+        this.evictRate = options.evictRate;
+        this.discarded = options.discarded;
+        this.expireTime = options.expireTime;
+        this.fail = options.fail;
         var self = this;
         $.each(promises || {}, function (key, promise) {
             self.set(key, promise, options);
@@ -175,7 +176,8 @@
         if (this.capacity < this.length) {
             this.evict(this.evictRate);
         }
-        if (options.fail) {
+        var fail = options.fail || this.fail;
+        if (fail) {
             var dfr = $.Deferred();
             interceptor = dfr.promise();
             this._promises[key] = {
@@ -184,25 +186,24 @@
             promise.then(function () {
                 dfr.resolveWith(this, arguments);
             }, function () {
-                options.fail(dfr);
+                fail(dfr, key, promise);
             });
         } else {
             this._promises[key] = {
                 promise: promise
             };
             promise.fail(function () {
-                if (self._promises[key].promise === promise) {
+                if (self._promises[key] && self._promises[key].promise === promise) {
                     this.remove(key);
                 }
             });
         }
         this._promises[key].discarded = options.discarded || this.discarded || noop;
-        var expireTime = options.expireTime !== undefined ? options.expiretime : this.expireTime;
+        var expireTime = options.expireTime !== undefined ? options.expireTime : this.expireTime;
         if (expireTime !== undefined) {
             window.setTimeout(function () {
-                if (this._promises[key].promise === (interceptor || promise)) {
-                    delete this._promises[key];
-                    this._promises[key].discarded(key, promise);
+                if (self._promises[key] && self._promises[key].promise === (interceptor || promise)) {
+                    self.remove(key);
                 }
             }, expireTime);
         }
@@ -274,8 +275,8 @@
         var dfr2 = $.Deferred();
         var promises = {
             'first': dfr1,
-            'second': dfr2,
-            'third': dfr1
+                'second': dfr2,
+                'third': dfr1
         };
         var cache = $.PromiseCache(promises);
         var cached = cache.promises();
@@ -283,4 +284,162 @@
         assert.strictEqual(cached.second, promises.second, '2 promises method returns all promises in cache');
         assert.strictEqual(cached.third, promises.third, '3 promises method returns all promises in cache');
     });
+
+    QUnit.module('Settings');
+    QUnit.test("capacity and evict initialization", function (assert) {
+        expect(3);
+        assert.throws(function () {
+            $.PromiseCache({}, {
+                capacity: 100
+            }, Error, 'capacity requires eviction method');
+        });
+        $.PromiseCache({}, {
+            capacity: 100,
+            eviction: {
+                evict: function () {
+                    assert.ok(true, 'evict called');
+                }
+            }
+        }).evict();
+        $.PromiseCache({}, {
+            capacity: 100,
+            eviction: 'lru'
+        });
+        assert.ok(true, 'algorithm does not throw');
+    });
+
+    QUnit.test("discarded", function (assert) {
+        expect(5);
+        var dfr = $.Deferred();
+        $.PromiseCache({
+            'first': dfr
+        }, {
+            discarded: function (key, promise) {
+                assert.strictEqual(key, 'first', 'discarded key ok');
+                assert.strictEqual(promise, dfr, 'discarded promise ok');
+            }
+        }).remove('first');
+        var cache = $.PromiseCache(null, {
+            discarded: function () {
+                throw new Error('I should be overrided');
+            }
+        });
+        cache.set('first', dfr, {
+            discarded: function (key, promise) {
+                assert.strictEqual(key, 'first', 'discarded key ok');
+                assert.strictEqual(promise, dfr, 'discarded promise ok');
+            }
+        });
+        cache.remove('first');
+        cache.set('first', dfr);
+        assert.throws(function () {
+            cache.remove('first');
+        });
+    });
+
+    QUnit.asyncTest("promise fail interception", function (assert) {
+        expect(6);
+        var dfr = $.Deferred();
+        var dfr2 = $.Deferred().reject();
+        var dfr3 = $.Deferred();
+        var cache = $.PromiseCache({
+            'first': dfr,
+                'second': dfr2
+        }, {
+            fail: function (deferred, key, promise) {
+                assert.ok(true, 'fail called');
+                if (key === 'first') {
+                    assert.strictEqual(promise, dfr, 'fail promise/key ok');
+                }
+                deferred.resolve();
+            }
+        });
+        dfr.reject();
+        cache.get('first').done(function () {
+            assert.ok(true, 'resolved');
+            cache.set('third', dfr3, {
+                fail: function (dfr, key, promise) {
+                    assert.ok(true, 'override fail ok');
+                    QUnit.start();
+                }
+            });
+            dfr3.reject();
+        }).fail(function () {
+            assert.ok(false, 'never called');
+        });
+        cache.get('second').done(function () {
+            assert.ok(true, 'resolved');
+        });
+
+    });
+
+    QUnit.asyncTest("expireTime method", function (assert) {
+        expect(4);
+        var dfr = $.Deferred();
+        var cache = $.PromiseCache({
+            'first': dfr
+        }, {
+            expireTime: 1,
+            discarded: function (key, promise) {
+                assert.ok(true, key + ' expired');
+            }
+        });
+        cache.set('second', dfr);
+        var millis = Date.now();
+        cache.set('third', dfr, {
+            expireTime: 10,
+            discarded: function (key) {
+                var elapsed = Date.now() - millis;
+                //8 for tolerance
+                assert.ok(elapsed > 8, 'third expireTime override expected >= 10, elapsed: ' + elapsed);
+                QUnit.start();
+            }
+        });
+        cache.set('fourth', dfr, {
+            expireTime: 5,
+            discarded: function (key) {
+                var elapsed = Date.now() - millis;
+                //8 for tolerance
+                assert.ok(elapsed < 8, 'fourth deleted before expire expected immediate removal, elapsed: ' + elapsed);
+            }
+        });
+        cache.remove('fourth');
+
+    });
+
+    QUnit.test("eviction methods", function (assert) {
+        expect(5);
+        var dfr = $.Deferred();
+        var cache = $.PromiseCache(null, {
+            eviction: {
+                init: function (cache, promises, options) {
+                    var check = cache.get && options.eviction && promises === null;
+                    assert.ok(check, 'check init parameters');
+                },
+                set: function (ch, key, promise, options) {
+                    var check = ch === cache && key === 'first' && promise === dfr && options.custom;
+                    assert.ok(check, 'check set parameters');
+                },
+                get: function (ch, key, promise) {
+                    var check = ch === cache && key === 'first' && promise.promise === dfr;
+                    assert.ok(check, 'check get parameters');
+                },
+                evict: function (ch, nEvicted) {
+                    var check = ch === cache && nEvicted === 3;
+                    assert.ok(check, 'check evict parameters');
+                },
+                remove: function (ch, key, promise) {
+                    var check = ch === cache && !cache.promises().first && key === 'first' && promise.promise === dfr;
+                    assert.ok(check, 'check remove key already removed and parameters');
+
+                }
+            }
+        });
+        cache.set('first', dfr, {custom: true});
+        cache.get('first');
+        cache.evict(3);
+        cache.remove('first');
+    });
+
+    QUnit.module('eviction algorithms');
 })();
