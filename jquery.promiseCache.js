@@ -6,11 +6,15 @@
             this.counter = 0;
         };
 
-        LruCons.prototype.set = function (cache, key, promise) {
+        LruCons.prototype.init = function (cache) {
+            this.cache = cache;
+        };
+
+        LruCons.prototype.set = function (key, promise) {
             promise.lru = 0;
         };
 
-        LruCons.prototype.get = function (cache, key, promise) {
+        LruCons.prototype.get = function (key, promise) {
             this.counter += 1;
             promise.lru = this.counter;
         };
@@ -18,27 +22,26 @@
         LruCons.prototype.evict = function (nEvicted) {
             var self = this;
             var limit;
-            if (cache.promises[0]) {
-                limit = cache.promises[0].promise.lru - 1;
+            if (this.cache._promises[0]) {
+                limit = this.cache._promises[0].lru;
             }
             var evicted = [];
-            $.each(cache.promises, function (key, promise) {
-                if (limit > promise.lru) {
+            $.each(this.cache._promises, function (key, promise) {
+                if (limit > promise.lru || evicted.length < nEvicted) {
                     var i = 1;
-                    while (!evicted[i] || evicted[i].lru > promise.lru) {
+                    while (evicted[i] && evicted[i].lru > promise.lru && i < nEvicted) {
                         evicted[i - 1] = evicted[i];
                         i += 1;
                     }
-                    limit = evicted[0].lru;
-                    evicted[i] = {
+                    evicted[i - 1] = {
                         lru: promise.lru,
                         lruKey: key
                     };
+                    limit = evicted[0].lru;
                 }
-                promise.lru -= self.counter;
             });
             $.each(evicted, function (key, obj) {
-                cache.remove(obj.lruKey);
+                self.cache.remove(obj.lruKey);
             });
         };
         return LruCons;
@@ -154,7 +157,7 @@
         this.eviction = eviction;
         this.eviction.init(this, promises, options);
         this.capacity = options.capacity;
-        this.evictRate = options.evictRate;
+        this.evictRate = options.evictRate || 1;
         this.discarded = options.discarded;
         this.expireTime = options.expireTime;
         this.fail = options.fail;
@@ -165,35 +168,37 @@
     };
 
     PromiseCacheCons.prototype.set = function (key, promise, options) {
-        options = options || {};
+        if (promise) options = options || {};
         var self = this;
         var interceptor;
-        if (!promise.then) {
+        if (!promise || !promise.then) {
             throw new Error('promise: ' + promise + ' is not a Promise');
         }
-        this.eviction.set(this, key, promise, options);
         this.length += 1;
         if (this.capacity < this.length) {
             this.evict(this.evictRate);
         }
         var fail = options.fail || this.fail;
+        var promiseObj;
         if (fail) {
             var dfr = $.Deferred();
             interceptor = dfr.promise();
-            this._promises[key] = {
+            promiseObj = {
                 promise: interceptor
             };
+            this._promises[key] = promiseObj;
             promise.then(function () {
                 dfr.resolveWith(this, arguments);
             }, function () {
                 fail(dfr, key, promise);
             });
         } else {
-            this._promises[key] = {
+            promiseObj = {
                 promise: promise
             };
+            this._promises[key] = promiseObj;
             promise.fail(function () {
-                if (self._promises[key] && self._promises[key].promise === promise) {
+                if (self._promises[key] && self._promises[key] === promiseObj) {
                     this.remove(key);
                 }
             });
@@ -202,11 +207,12 @@
         var expireTime = options.expireTime !== undefined ? options.expireTime : this.expireTime;
         if (expireTime !== undefined) {
             window.setTimeout(function () {
-                if (self._promises[key] && self._promises[key].promise === (interceptor || promise)) {
+                if (self._promises[key] && self._promises[key] === promiseObj) {
                     self.remove(key);
                 }
             }, expireTime);
         }
+        this.eviction.set(key, promiseObj, promise, options);
     };
 
     PromiseCacheCons.prototype.remove = function (key) {
@@ -214,15 +220,17 @@
         if (promise !== undefined) {
             delete this._promises[key];
             this.length -= 1;
-            this.eviction.remove(this, key, promise);
+            this.eviction.remove(key, promise);
             promise.discarded(key, promise.promise);
             return promise.promise;
         }
     };
 
     PromiseCacheCons.prototype.get = function (key) {
-        this.eviction.get(this, key, this._promises[key]);
-        return this._promises[key] ? this._promises[key].promise : undefined;
+        if (this._promises[key]) {
+            this.eviction.get(key, this._promises[key]);
+            return this._promises[key].promise;
+        }
     };
 
     PromiseCacheCons.prototype.promises = function () {
@@ -234,7 +242,7 @@
     };
 
     PromiseCacheCons.prototype.evict = function (nEvicted) {
-        this.eviction.evict(this, nEvicted);
+        this.eviction.evict(nEvicted);
     };
 }(jQuery));
 
@@ -416,30 +424,95 @@
                     var check = cache.get && options.eviction && promises === null;
                     assert.ok(check, 'check init parameters');
                 },
-                set: function (ch, key, promise, options) {
-                    var check = ch === cache && key === 'first' && promise === dfr && options.custom;
+                set: function (key, promiseObj, promise, options) {
+                    var check = key === 'first' && promise === dfr && promiseObj.promise === dfr && options.custom;
                     assert.ok(check, 'check set parameters');
                 },
-                get: function (ch, key, promise) {
-                    var check = ch === cache && key === 'first' && promise.promise === dfr;
+                get: function (key, promise) {
+                    var check = key === 'first' && promise.promise === dfr;
                     assert.ok(check, 'check get parameters');
                 },
-                evict: function (ch, nEvicted) {
-                    var check = ch === cache && nEvicted === 3;
+                evict: function (nEvicted) {
+                    var check = nEvicted === 3;
                     assert.ok(check, 'check evict parameters');
                 },
-                remove: function (ch, key, promise) {
-                    var check = ch === cache && !cache.promises().first && key === 'first' && promise.promise === dfr;
+                remove: function (key, promise) {
+                    var check = !cache.promises().first && key === 'first' && promise.promise === dfr;
                     assert.ok(check, 'check remove key already removed and parameters');
 
                 }
             }
         });
-        cache.set('first', dfr, {custom: true});
+        cache.set('first', dfr, {
+            custom: true
+        });
         cache.get('first');
+        cache.get('none'); //no method called
         cache.evict(3);
         cache.remove('first');
     });
 
     QUnit.module('eviction algorithms');
+
+    var testCache = function () {
+        var dfrs = [$.Deferred(), $.Deferred(), $.Deferred(), $.Deferred()];
+        return {
+            promises: {
+                0: dfrs[0],
+                1: dfrs[1],
+                2: dfrs[2],
+                3: dfrs[3]
+            },
+            options: {
+                capacity: 2
+            }
+        };
+    };
+
+    QUnit.test("LRU get", function (assert) {
+        var ch = testCache();
+        ch.options.eviction = 'lru';
+        ch.options.capacity = 10;
+        var cache = $.PromiseCache(ch.promises, ch.options);
+        assert.strictEqual(cache._promises[0].lru, 0, 'After set promise lru 0');
+        cache.get(0);
+        assert.strictEqual(cache._promises[0].lru, 1, 'After get promise lru 1');
+        cache.get(1);
+        assert.strictEqual(cache._promises[1].lru, 2, 'After other get promise lru 2');
+    });
+
+    QUnit.asyncTest("LRU eviction", function (assert) {
+        expect(3);
+        var ch = testCache();
+        var order = 0;
+        ch.options.discarded = function (key, promise) {
+            switch (order) {
+                case 0:
+                    assert.equal(key, 1, 'first evicted 1');
+                    order++;
+                    break;
+                case 1:
+                    assert.equal(key, 2, 'second evicted 2');
+                    order++;
+                    break;
+                case 2:
+                    assert.equal(key, 0, 'third evicted 0');
+                    order++;
+                    QUnit.start();
+                    break;
+            }
+        };
+        ch.options.eviction = 'lru';
+        var cache = $.PromiseCache(null, ch.options);
+        cache.set(0, ch.promises[0]);
+        cache.set(1, ch.promises[1]);
+        cache.get(0);
+        cache.get(1);
+        cache.get(0);
+        cache.set(2, ch.promises[2]);
+        cache.set(3, ch.promises[3]);
+        cache.get(3);
+        cache.set(1, ch.promises[1]);
+    });
+
 })();
