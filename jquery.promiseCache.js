@@ -26,18 +26,22 @@
                 limit = this.cache._promises[0].lru;
             }
             var evicted = [];
+            var evictedSize = 0;
             $.each(this.cache._promises, function (key, promise) {
-                if (limit > promise.lru || evicted.length < nEvicted) {
+                if (limit > promise.lru || evictedSize < nEvicted) {
                     var i = 1;
-                    while (evicted[i] && evicted[i].lru > promise.lru && i < nEvicted) {
+                    var notFilled = i < nEvicted && !evicted[i];
+                    while (notFilled || (evicted[i] && evicted[i].lru > promise.lru)) {
                         evicted[i - 1] = evicted[i];
                         i += 1;
+                        notFilled = i < nEvicted && !evicted[i];
                     }
                     evicted[i - 1] = {
                         lru: promise.lru,
                         lruKey: key
                     };
-                    limit = evicted[0].lru;
+                    evictedSize += 1;
+                    limit = evicted[0] ? evicted[0].lru : limit;
                 }
             });
             $.each(evicted, function (key, obj) {
@@ -52,11 +56,15 @@
             this.counter = 0;
         };
 
-        MruCons.prototype.set = function (cache, key, promise) {
+        MruCons.prototype.init = function (cache) {
+            this.cache = cache;
+        };
+
+        MruCons.prototype.set = function (key, promise) {
             promise.mru = 0;
         };
 
-        MruCons.prototype.get = function (cache, key, promise) {
+        MruCons.prototype.get = function (key, promise) {
             this.counter += 1;
             promise.mru = this.counter;
         };
@@ -64,29 +72,31 @@
         MruCons.prototype.evict = function (nEvicted) {
             var self = this;
             var limit;
-            if (cache.promises[0]) {
-                limit = cache.promises[0].promise.mru - 1;
+            if (this.cache._promises[0]) {
+                limit = this.cache._promises[0].mru;
             }
             var evicted = [];
-            $.each(cache.promises, function (key, promise) {
-                if (limit < promise.mru) {
+            var evictedSize = 0;
+            $.each(this.cache._promises, function (key, promise) {
+                if (limit < promise.mru || evictedSize < nEvicted) {
                     var i = 1;
-                    while (!evicted[i] || evicted[i].mru < promise.mru) {
+                    var notFilled = i < nEvicted && !evicted[i];
+                    while (notFilled || (evicted[i] && evicted[i].mru < promise.mru)) {
                         evicted[i - 1] = evicted[i];
                         i += 1;
+                        notFilled = i < nEvicted && !evicted[i];
                     }
-                    limit = evicted[0].mru;
-                    evicted[i] = {
+                    evicted[i - 1] = {
                         mru: promise.mru,
                         mruKey: key
                     };
+                    evictedSize += 1;
+                    limit = evicted[0] ? evicted[0].mru : limit;
                 }
-                promise.mru -= self.counter;
             });
             $.each(evicted, function (key, obj) {
-                cache.remove(obj.mruKey);
+                self.cache.remove(obj.mruKey);
             });
-            self.counter = 0;
         };
         return MruCons;
     })();
@@ -174,9 +184,11 @@
         if (!promise || !promise.then) {
             throw new Error('promise: ' + promise + ' is not a Promise');
         }
-        this.length += 1;
-        if (this.capacity < this.length) {
-            this.evict(this.evictRate);
+        if (!this._promises[key]){
+          this.length += 1;
+          if (this.capacity < this.length) {
+              this.evict(this.evictRate);
+          }
         }
         var fail = options.fail || this.fail;
         var promiseObj;
@@ -469,6 +481,12 @@
         };
     };
 
+    var getSequence = function(cache, getsArray){
+      $.each(getsArray, function(i, key){
+        cache.get(key);
+      });
+    };
+
     QUnit.test("LRU get", function (assert) {
         var ch = testCache();
         ch.options.eviction = 'lru';
@@ -481,8 +499,8 @@
         assert.strictEqual(cache._promises[1].lru, 2, 'After other get promise lru 2');
     });
 
-    QUnit.asyncTest("LRU eviction", function (assert) {
-        expect(3);
+    QUnit.test("LRU eviction", function (assert) {
+        expect(6);
         var ch = testCache();
         var order = 0;
         ch.options.discarded = function (key, promise) {
@@ -498,7 +516,6 @@
                 case 2:
                     assert.equal(key, 0, 'third evicted 0');
                     order++;
-                    QUnit.start();
                     break;
             }
         };
@@ -506,13 +523,70 @@
         var cache = $.PromiseCache(null, ch.options);
         cache.set(0, ch.promises[0]);
         cache.set(1, ch.promises[1]);
-        cache.get(0);
-        cache.get(1);
-        cache.get(0);
+        getSequence(cache, [0,1,0]);
         cache.set(2, ch.promises[2]);
         cache.set(3, ch.promises[3]);
         cache.get(3);
         cache.set(1, ch.promises[1]);
+        order = 0;
+        var ch2 = testCache();
+        ch2.options.discarded = ch.options.discarded;
+        ch2.options.evictRate = 3;
+        ch2.options.capacity = 4;
+        ch2.options.eviction = 'lru';
+        var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+        getSequence(cache2, [0,1,2,1,3,2,1,3,3]);
+        cache2.set(5, ch.promises[1]); 
+    });
+
+    QUnit.test("MRU get", function (assert) {
+        var ch = testCache();
+        ch.options.eviction = 'mru';
+        ch.options.capacity = 10;
+        var cache = $.PromiseCache(ch.promises, ch.options);
+        assert.strictEqual(cache._promises[0].mru, 0, 'After set promise mru 0');
+        cache.get(0);
+        assert.strictEqual(cache._promises[0].mru, 1, 'After get promise mru 1');
+    });
+
+    QUnit.test("MRU eviction", function (assert) {
+        expect(6);
+        var ch = testCache();
+        var order = 0;
+        ch.options.discarded = function (key, promise) {
+            switch (order) {
+                case 0:
+                    assert.equal(key, 0, 'first evicted 1');
+                    order++;
+                    break;
+                case 1:
+                    assert.equal(key, 1, 'second evicted 2');
+                    order++;
+                    break;
+                case 2:
+                    assert.equal(key, 3, 'third evicted 0');
+                    order++;
+                    break;
+            }
+        };
+        ch.options.eviction = 'mru';
+        var cache = $.PromiseCache(null, ch.options);
+        cache.set(0, ch.promises[0]);
+        cache.set(1, ch.promises[1]);
+        getSequence(cache, [0,1,0]);
+        cache.set(2, ch.promises[2]);
+        cache.set(3, ch.promises[3]);
+        cache.get(3);
+        cache.set(1, ch.promises[1]);
+        order = 0;
+        var ch2 = testCache();
+        ch2.options.discarded = ch.options.discarded;
+        ch2.options.evictRate = 3;
+        ch2.options.capacity = 4;
+        ch2.options.eviction = 'mru';
+        var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+        getSequence(cache2, [1,2,0,2,3,0,1,3,3]);
+        cache2.set(5, ch.promises[1]); 
     });
 
 })();
