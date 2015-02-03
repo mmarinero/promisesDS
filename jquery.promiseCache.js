@@ -105,26 +105,46 @@
 
         var LfuCons = function () {};
 
-        LfuCons.prototype.set = function (cache, key, promise) {
+        LfuCons.prototype.init = function (cache) {
+            this.cache = cache;
+        };
+
+        LfuCons.prototype.set = function (key, promise) {
             promise.lfu = 0;
         };
 
-        LfuCons.prototype.get = function (cache, key, promise) {
+        LfuCons.prototype.get = function (key, promise) {
             promise.lfu += 1;
         };
 
         LfuCons.prototype.evict = function (nEvicted) {
             var self = this;
-            var minCount = 0;
-            var lfuKey = null;
-            $.each(cache.promises, function (key, promise) {
-                if (minCount > promise.lfu) {
-                    lfuKey = key;
-                    maxCount = promise.lfu;
+            var limit;
+            if (this.cache._promises[0]) {
+                limit = this.cache._promises[0].lfu;
+            }
+            var evicted = [];
+            var evictedSize = 0;
+            $.each(this.cache._promises, function (key, promise) {
+                if (limit > promise.lfu || evictedSize < nEvicted) {
+                    var i = 1;
+                    var notFilled = i < nEvicted && !evicted[i];
+                    while (notFilled || (evicted[i] && evicted[i].lfu > promise.lfu)) {
+                        evicted[i - 1] = evicted[i];
+                        i += 1;
+                        notFilled = i < nEvicted && !evicted[i];
+                    }
+                    evicted[i - 1] = {
+                        lfu: promise.lfu,
+                        lfuKey: key
+                    };
+                    evictedSize += 1;
+                    limit = evicted[0] ? evicted[0].lfu : limit;
                 }
-                promise.lfu -= 1;
             });
-            cache.remove(lfuKey);
+            $.each(evicted, function (key, obj) {
+                self.cache.remove(obj.lfuKey);
+            });
         };
         return LfuCons;
     })();
@@ -586,6 +606,56 @@
         ch2.options.eviction = 'mru';
         var cache2 = $.PromiseCache(ch2.promises, ch2.options);
         getSequence(cache2, [1,2,0,2,3,0,1,3,3]);
+        cache2.set(5, ch.promises[1]); 
+    });
+
+    QUnit.test("LFU get", function (assert) {
+        var ch = testCache();
+        ch.options.eviction = 'lfu';
+        ch.options.capacity = 10;
+        var cache = $.PromiseCache(ch.promises, ch.options);
+        assert.strictEqual(cache._promises[0].lfu, 0, 'After set promise lfu 0');
+        cache.get(0);
+        assert.strictEqual(cache._promises[0].lfu, 1, 'After get promise lfu 1');
+    });
+
+    QUnit.test("LFU eviction", function (assert) {
+        expect(6);
+        var ch = testCache();
+        var order = 0;
+        ch.options.discarded = function (key, promise) {
+            switch (order) {
+                case 0:
+                    assert.equal(key, 1, 'first evicted 1');
+                    order++;
+                    break;
+                case 1:
+                    assert.equal(key, 2, 'second evicted 2');
+                    order++;
+                    break;
+                case 2:
+                    assert.equal(key, 3, 'third evicted 0');
+                    order++;
+                    break;
+            }
+        };
+        ch.options.eviction = 'lfu';
+        var cache = $.PromiseCache(null, ch.options);
+        cache.set(0, ch.promises[0]);
+        cache.set(1, ch.promises[1]);
+        getSequence(cache, [0,1,0]);
+        cache.set(2, ch.promises[2]);
+        cache.set(3, ch.promises[3]);
+        cache.get(3);
+        cache.set(1, ch.promises[1]);
+        order = 0;
+        var ch2 = testCache();
+        ch2.options.discarded = ch.options.discarded;
+        ch2.options.evictRate = 3;
+        ch2.options.capacity = 4;
+        ch2.options.eviction = 'lfu';
+        var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+        getSequence(cache2, [3,2,0,2,1,0,0,0,1,1]);
         cache2.set(5, ch.promises[1]); 
     });
 
