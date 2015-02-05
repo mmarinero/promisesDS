@@ -1,6 +1,10 @@
 (function ($) {
     "use strict";
 
+    /**
+     * Least recent used cache eviction implementation
+     * @see PromiseCache::evict(int)
+     */
     var Lru = (function () {
         var LruCons = function () {
             this.counter = 0;
@@ -9,6 +13,7 @@
         LruCons.prototype.init = function (cache) {
             this.cache = cache;
         };
+
 
         LruCons.prototype.set = function (key, promise) {
             promise.lru = 0;
@@ -19,6 +24,12 @@
             promise.lru = this.counter;
         };
 
+        /**
+         * The evict method is somewhat costly since get a set are
+         * trivial, it finds nEvicted elements in a pass over the cache.
+         * @TODO Simplify algorithm
+         * @param  {int} nEvicted number of elements to evict from the cache
+         */
         LruCons.prototype.evict = function (nEvicted) {
             var self = this;
             var limit;
@@ -51,6 +62,10 @@
         return LruCons;
     })();
 
+    /**
+     * Most recent used eviction algorithm
+     * @see PromiseCache::evict()
+     */
     var Mru = (function () {
         var MruCons = function () {
             this.counter = 0;
@@ -69,6 +84,11 @@
             promise.mru = this.counter;
         };
 
+        /**
+         * @see Lru::evict(int)
+         * @TODO Simplify algorithm
+         * @param  {int} nEvicted number of elements to evict from the cache
+         */
         MruCons.prototype.evict = function (nEvicted) {
             var self = this;
             var limit;
@@ -101,6 +121,10 @@
         return MruCons;
     })();
 
+    /**
+     * Least frequently used eviction algorithm
+     * @see PromiseCache::evict()
+     */
     var Lfu = (function () {
 
         var LfuCons = function () {};
@@ -117,6 +141,11 @@
             promise.lfu += 1;
         };
 
+        /**
+         * @see Lru::evict(int)
+         * @TODO Simplify algorithm
+         * @param  {int} nEvicted number of elements to evict from the cache
+         */
         LfuCons.prototype.evict = function (nEvicted) {
             var self = this;
             var limit;
@@ -149,18 +178,53 @@
         return LfuCons;
     })();
 
+    /**
+     * Map from algorithms names to classes.
+     * @type {Object}
+     */
     var algorithms = {
         lru: Lru,
         mru: Mru,
         lfu: Lfu
     };
 
+    /**
+     * The promise cache is a small cache implementation for with some features 
+     * to manage promises as failure management and expire time.
+     * It has an eviction interface that decouples the algorithm and offers LRU,
+     * MRU and LFU implementations.
+     * It's based on jQuery Deferred objects
+     * @param {Object[key- > promise]} promises Initial set of promises to cache with the keys
+     *                                   present in the object
+     * @param {Object} options {
+     *                          eviction Object|string: eviction algorithm 
+     *                              ('lru', 'mru', 'lfu') or object implementing 
+     *                              the eviction interface @see PromiseCache::evict(int)
+     *                          capacity int: Cache max number of promises, it will call
+     *                              evict when full
+     *                          evictRate int: Number of promises to evict when the cache
+     *                              is full, it may be more efficient if the eviction algorihm
+     *                              is costly.
+     *                          discarded function(key, promise): optional default function 
+     *                              @see PromiseCache::set
+     *                          expireTime int: optional default number of seconds before 
+     *                              the promise is removed from the cache
+     *                          fail function(dfr: Deferred, key, promise): optional default 
+     *                              function @see PromiseCache::set
+     *                         }
+     */
     $.PromiseCache = function (promises, options) {
         return new PromiseCacheCons(promises, options);
     };
 
     var noop = function () {};
 
+    /**
+     * Constructor, initializes the cache and eviction, finally sets
+     * the initial set of promises
+     * @param {Object[key- > promise]} @see PromiseCache
+     * @param {Object} options @see PromiseCache
+     */
     var PromiseCacheCons = function (promises, options) {
         options = options || {};
         this._promises = {};
@@ -197,6 +261,28 @@
         });
     };
 
+    /**
+     * Sets a promise in the cache with key and options that override the default versions,
+     * can trigger eviction if capacity is exceeded.
+     * @param {string} key to access the cached promise
+     * @param {Promise} promise Promise to save in the cache
+     * @param {Object} options { This options override the defaults available in the constructor
+     *                          discarded function(key, promise): optional, function to be called 
+     *                              when the element is removed from the cache
+     *                          expireTime int: optional, number of seconds before the promise is 
+     *                              removed from the cache
+     *                          fail function(dfr: Deferred, key, promise): optional, if present
+     *                              or the default exists a new promise will be created and set in
+     *                              the cache, this promise will be succeed when the original is 
+     *                              resolved. 
+     *                              If the original promise is rejected the fail function will be
+     *                              called and dfr can be used to resolve or reject the new promise
+     *                              that all the users of the get method have.
+     *                              This allow the setter to centralize error handling and 
+     *                              potentially provide transparent retries and recovery procedures
+     *                              for the getters.
+     *                         }
+     */
     PromiseCacheCons.prototype.set = function (key, promise, options) {
         if (promise) options = options || {};
         var self = this;
@@ -247,6 +333,12 @@
         this.eviction.set(key, promiseObj, promise, options);
     };
 
+    /**
+     * Remove the key from the cache and calls the discarded callback if it exists, it is called
+     * by the eviction algorithms when clearing the cache.
+     * @param  {string} key cache entry to remove
+     * @return {Promise|undefined} Removed promise or undefined it it doesn't exist
+     */
     PromiseCacheCons.prototype.remove = function (key) {
         var promise = this._promises[key];
         if (promise !== undefined) {
@@ -258,6 +350,11 @@
         }
     };
 
+    /**
+     * Retrieves the promise in the cache stored with the key
+     * @param  {string} key cache entry to retrieve
+     * @return {Promise|undefined} Promise stored with the key or undefined if it doesn't exist
+     */
     PromiseCacheCons.prototype.get = function (key) {
         if (this._promises[key]) {
             this.eviction.get(key, this._promises[key]);
@@ -265,6 +362,11 @@
         }
     };
 
+    /**
+     * Object containing all promises in the cache with their keys, the object is an independent
+     *  copy of the internal promises store.
+     * @return {Object} promises
+     */
     PromiseCacheCons.prototype.promises = function () {
         var cleanCopy = {};
         $.each(this._promises, function (key, promise) {
@@ -273,11 +375,18 @@
         return cleanCopy;
     };
 
+    /**
+     * Will remove nEvicted promises from the cache or all if larger than the number of promises
+     * @param  {int} nEvicted number of cache entries to clear
+     */
     PromiseCacheCons.prototype.evict = function (nEvicted) {
         this.eviction.evict(nEvicted);
     };
 }(jQuery));
 
+/**
+ * Unit tests
+ */
 (function () {
     "use strict";
     QUnit.module('Basic');
