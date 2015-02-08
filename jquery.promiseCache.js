@@ -2,6 +2,41 @@
     "use strict";
 
     /**
+     * Partial insertion sort function implemented to create a sorted array
+     * of promises to evict on one pass
+     * @param  {array[Promise]} promises set of promises to scan
+     * @param  {int} nEvicted number of promises to return
+     * @param  {string} prop     key name of the counter on the promise
+     * @param  {Boolean} desc     To invert the sort order
+     * @return {array[Promise]}  promises to evict
+     */
+    var evictionSort = function(promises, nEvicted, prop, desc){
+        desc = Boolean(desc);
+        var limit;
+        if (promises[0]) {
+            limit = promises[0][prop];
+        }
+        var evicted = [];
+        var evictedSize = 0;
+        $.each(promises, function (key, promise) {
+            if (desc === (limit <= promise[prop]) || evictedSize < nEvicted) {
+                var i = 1;
+                var notFilled = i < nEvicted && !evicted[i];
+                while (notFilled || (evicted[i] && desc === (evicted[i][prop]) <= promise[prop])) {
+                    evicted[i - 1] = evicted[i];
+                    i += 1;
+                    notFilled = i < nEvicted && !evicted[i];
+                }
+                evicted[i - 1] = {propKey: key};
+                evicted[i - 1][prop] = promise[prop];
+                evictedSize += 1;
+                limit = evicted[0] ? evicted[0][prop] : limit;
+            }
+        });
+        return evicted;
+    };
+
+    /**
      * Least recent used cache eviction implementation
      * @see PromiseCache::evict(int)
      */
@@ -31,32 +66,10 @@
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         LruCons.prototype.evict = function (nEvicted) {
-            var self = this;
-            var limit;
-            if (this.cache._promises[0]) {
-                limit = this.cache._promises[0].lru;
-            }
-            var evicted = [];
-            var evictedSize = 0;
-            $.each(this.cache._promises, function (key, promise) {
-                if (limit > promise.lru || evictedSize < nEvicted) {
-                    var i = 1;
-                    var notFilled = i < nEvicted && !evicted[i];
-                    while (notFilled || (evicted[i] && evicted[i].lru > promise.lru)) {
-                        evicted[i - 1] = evicted[i];
-                        i += 1;
-                        notFilled = i < nEvicted && !evicted[i];
-                    }
-                    evicted[i - 1] = {
-                        lru: promise.lru,
-                        lruKey: key
-                    };
-                    evictedSize += 1;
-                    limit = evicted[0] ? evicted[0].lru : limit;
-                }
-            });
+            var cache = this.cache;
+            var evicted = evictionSort(cache._promises, nEvicted, 'lru');
             $.each(evicted, function (key, obj) {
-                self.cache.remove(obj.lruKey);
+                cache.remove(obj.propKey);
             });
         };
         return LruCons;
@@ -90,32 +103,10 @@
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         MruCons.prototype.evict = function (nEvicted) {
-            var self = this;
-            var limit;
-            if (this.cache._promises[0]) {
-                limit = this.cache._promises[0].mru;
-            }
-            var evicted = [];
-            var evictedSize = 0;
-            $.each(this.cache._promises, function (key, promise) {
-                if (limit < promise.mru || evictedSize < nEvicted) {
-                    var i = 1;
-                    var notFilled = i < nEvicted && !evicted[i];
-                    while (notFilled || (evicted[i] && evicted[i].mru < promise.mru)) {
-                        evicted[i - 1] = evicted[i];
-                        i += 1;
-                        notFilled = i < nEvicted && !evicted[i];
-                    }
-                    evicted[i - 1] = {
-                        mru: promise.mru,
-                        mruKey: key
-                    };
-                    evictedSize += 1;
-                    limit = evicted[0] ? evicted[0].mru : limit;
-                }
-            });
+            var cache = this.cache;
+            var evicted = evictionSort(cache._promises, nEvicted, 'mru', true);
             $.each(evicted, function (key, obj) {
-                self.cache.remove(obj.mruKey);
+                cache.remove(obj.propKey);
             });
         };
         return MruCons;
@@ -147,32 +138,10 @@
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         LfuCons.prototype.evict = function (nEvicted) {
-            var self = this;
-            var limit;
-            if (this.cache._promises[0]) {
-                limit = this.cache._promises[0].lfu;
-            }
-            var evicted = [];
-            var evictedSize = 0;
-            $.each(this.cache._promises, function (key, promise) {
-                if (limit > promise.lfu || evictedSize < nEvicted) {
-                    var i = 1;
-                    var notFilled = i < nEvicted && !evicted[i];
-                    while (notFilled || (evicted[i] && evicted[i].lfu > promise.lfu)) {
-                        evicted[i - 1] = evicted[i];
-                        i += 1;
-                        notFilled = i < nEvicted && !evicted[i];
-                    }
-                    evicted[i - 1] = {
-                        lfu: promise.lfu,
-                        lfuKey: key
-                    };
-                    evictedSize += 1;
-                    limit = evicted[0] ? evicted[0].lfu : limit;
-                }
-            });
+            var cache = this.cache;
+            var evicted = evictionSort(cache._promises, nEvicted, 'lfu');
             $.each(evicted, function (key, obj) {
-                self.cache.remove(obj.lfuKey);
+                cache.remove(obj.propKey);
             });
         };
         return LfuCons;
