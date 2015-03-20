@@ -62,7 +62,6 @@
         /**
          * The evict method is somewhat costly since get a set are
          * trivial, it finds nEvicted elements in a pass over the cache.
-         * @TODO Simplify algorithm
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         LruCons.prototype.evict = function (nEvicted) {
@@ -99,7 +98,6 @@
 
         /**
          * @see Lru::evict(int)
-         * @TODO Simplify algorithm
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         MruCons.prototype.evict = function (nEvicted) {
@@ -134,7 +132,6 @@
 
         /**
          * @see Lru::evict(int)
-         * @TODO Simplify algorithm
          * @param  {int} nEvicted number of elements to evict from the cache
          */
         LfuCons.prototype.evict = function (nEvicted) {
