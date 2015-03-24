@@ -351,7 +351,7 @@
 }(jQuery));
 
 /**
- * Unit tests
+ * Unit tests QUnit 1.15
  */
 (function () {
     "use strict";
