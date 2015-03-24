@@ -327,7 +327,7 @@
     }]);
 
     /*
-     * Unit tests of the sequence
+     * Unit tests of the sequence QUnit 1.15
      */
     QUnit.module('Constructor');
     QUnit.asyncTest("action", function (assert) {
