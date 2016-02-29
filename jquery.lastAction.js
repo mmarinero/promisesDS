@@ -1,12 +1,10 @@
 (function($) {
     "use strict";
     /**
-     * The LastAction object keeps an ordered list of promises that perform actions
-     * that need to be executed in order on the server.
-     * An action is a function that returns a thenable
-     * The object prevents two actions to be executed concurrently allow for retries
-     * and also to drop not yet executed actions when a new one arrives.
-     * The promises will pipe their first resolved or rejected argument
+     * The LastAction object accepts actions (functions that return promises) only executing the last
+     * action available and dropping the rest. The object also waits for a executed action to complete before
+     * executing the next one.
+     * This basic functionality is enhanced by serveral auxiliary methods described below.
      * Note: This is a only client side solution to ordering actions, more network efficient solutions
      * can be achieved with server collaboration, sequence numbers, acks...
      */
@@ -36,9 +34,21 @@
         }, function(response) {
             var resolution = resolver(self, response, dfr);
             if (self._deferred === null){
-                this.onError(response);
+                self.onError(response);
             }
             return resolution;
+        });
+    };
+
+    var retrier = function(self, action, discarded, retries, dfr){
+        return self.push(action, discarded).then(function(response){
+            dfr.resolve(response);
+        }, function(response) {
+            if (self._deferred === null && retries > 0) {
+                retrier(self, action, discarded, retries - 1, dfr);
+            } else {
+                dfr.reject(response);
+            }
         });
     };
 
@@ -66,11 +76,13 @@
         },
 
         withRetry: function(action, retries, discarded) {
-            this.push(action, discarded).then(null, function() {
-                if (self._deferred === null && retries > 0) {
-                    this.withRetry(action, retries - 1, discarded);
-                }
-            });
+            var dfr = $.Deferred();
+            retrier(this, action, discarded, retries, dfr)
+            return dfr.promise();
+        },
+
+        unDroppable: function(action){
+
         },
 
         lastAction: function() {
@@ -87,7 +99,7 @@
 
     QUnit.test("lastPromise thenable", function(assert) {
         var done = assert.async();
-        var actions = $.LastAction(0, true);
+        var actions = $.LastAction();
         actions.push(function() {
             assert.ok(true, 'action chained');
             done();
@@ -97,7 +109,7 @@
 
     QUnit.test("Rejected actions don't stop next action", function(assert) {
         var done = assert.async();
-        var actions = $.LastAction(0, true);
+        var actions = $.LastAction();
         var firstAction = actions.push(function() {
             return $.Deferred().reject();
         });
@@ -118,7 +130,7 @@
 
     QUnit.test("Drop one request", function(assert) {
         var done = assert.async();
-        var actions = $.LastAction(0, true);
+        var actions = $.LastAction();
         var resolution = $.Deferred()
         actions.push(function() {
             return resolution;
@@ -135,6 +147,18 @@
             return $.Deferred();
         })
         resolution.resolve();
+    });
+
+    QUnit.test("With retry", function(assert) {
+        assert.expect(2);
+        var done = assert.async();
+        var actions = $.LastAction(0, true);
+        var resolution = $.Deferred()
+        actions.withRetry(function() {
+            assert.ok(true, 'This action should be executed 2 times');
+            return resolution;
+        }, 1).then(null, done);
+        resolution.reject();
     });
 
 
