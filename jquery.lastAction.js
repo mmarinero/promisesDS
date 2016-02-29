@@ -4,24 +4,26 @@
      * The LastAction object accepts actions (functions that return promises) only executing the last
      * action available and dropping the rest. The object also waits for a executed action to complete before
      * executing the next one.
-     * This basic functionality is enhanced by serveral auxiliary methods described below.
      * Note: This is a only client side solution to ordering actions, more network efficient solutions
      * can be achieved with server collaboration, sequence numbers, acks...
      */
-    $.LastAction = function(onError) {
-        return new LastActionCons(onError);
+    $.LastAction = function(onComplete, onError, retries) {
+        return new LastActionCons(onComplete, onError, retries);
     };
 
-    var LastActionCons = function(onError) {
+    var LastActionCons = function(onComplete, onError, retries) {
         this.onError = onError || $.noop;
+        this.onComplete = onComplete || $.noop;
+        this.retries = retries;
         this._deferred = null;
         this.lastAction = null;
     };
 
-    var resolver = function(self, response, dfr) {
+    var resolver = function(self, response, dfr, callback) {
         if (dfr === self._deferred) {
             self._deferred = null;
             self._lastResponse = response;
+            callback(response);
         } else {
             self._deferred.resolve(response);
         }
@@ -30,18 +32,14 @@
 
     var actionExecuter = function(self, action, response, dfr) {
         return action(response).then(function(response) {
-            return resolver(self, response, dfr);
+            return resolver(self, response, dfr, self.onComplete);
         }, function(response) {
-            var resolution = resolver(self, response, dfr);
-            if (self._deferred === null){
-                self.onError(response);
-            }
-            return resolution;
+            return resolver(self, response, dfr, self.onError);
         });
     };
 
     var retrier = function(self, action, discarded, retries, dfr){
-        return self.push(action, discarded).then(function(response){
+        return add(self, action, discarded).then(function(response){
             dfr.resolve(response);
         }, function(response) {
             if (self._deferred === null && retries > 0) {
@@ -52,37 +50,33 @@
         });
     };
 
+    var add = function(self, action, discarded) {
+        self.lastAction = action;
+        if (!discarded) {
+            discarded = $.noop;
+        }
+        var dfr = $.Deferred();
+        if (self._deferred) {
+            self._deferred = dfr;
+            return self._deferred.then(function(response) {
+                return actionExecuter(self, action, response, dfr);
+            }, discarded);
+        } else {
+            self._deferred = dfr;
+            return actionExecuter(self, action, self._lastResponse, dfr);
+        }
+    };
+
+
     LastActionCons.prototype = {
         /**
          * Add a new action to the list.
          */
-        push: function(action, discarded) {
-            this.lastAction = action;
-            if (!discarded) {
-                discarded = $.noop;
-            }
-            var self = this;
-            var dfr = $.Deferred();
-            if (self._deferred) {
-                self._deferred.reject();
-                self._deferred = dfr;
-                return self._deferred.then(function(response) {
-                    return actionExecuter(self, action, response, dfr);
-                }, discarded);
-            } else {
-                self._deferred = dfr;
-                return actionExecuter(self, action, self._lastResponse, dfr);
-            }
-        },
-
-        withRetry: function(action, retries, discarded) {
+        push: function(action, discarded, retries) {
+            retries = retries === undefined ? this.retries : retries;
             var dfr = $.Deferred();
             retrier(this, action, discarded, retries, dfr)
             return dfr.promise();
-        },
-
-        unDroppable: function(action){
-
         },
 
         lastAction: function() {
@@ -98,6 +92,7 @@
     "use strict";
 
     QUnit.test("lastPromise thenable", function(assert) {
+        assert.expect(1);
         var done = assert.async();
         var actions = $.LastAction();
         actions.push(function() {
@@ -108,6 +103,7 @@
     });
 
     QUnit.test("Rejected actions don't stop next action", function(assert) {
+        assert.expect(2);
         var done = assert.async();
         var actions = $.LastAction();
         var firstAction = actions.push(function() {
@@ -129,6 +125,7 @@
     });
 
     QUnit.test("Drop one request", function(assert) {
+        assert.expect(1);
         var done = assert.async();
         var actions = $.LastAction();
         var resolution = $.Deferred()
@@ -150,15 +147,53 @@
     });
 
     QUnit.test("With retry", function(assert) {
+        assert.expect(3);
+        var done = assert.async();
+        var actions = $.LastAction();
+        var resolution = $.Deferred()
+        actions.push(function() {
+            assert.ok(true, 'This action should be executed 3 times');
+            return resolution;
+        }, null, 2).then(null, done);
+        resolution.reject();
+    });
+
+    QUnit.test("With retry on definition", function(assert) {
         assert.expect(2);
         var done = assert.async();
-        var actions = $.LastAction(0, true);
+        var actions = $.LastAction(null, null, 1);
         var resolution = $.Deferred()
-        actions.withRetry(function() {
+        actions.push(function() {
             assert.ok(true, 'This action should be executed 2 times');
             return resolution;
-        }, 1).then(null, done);
+        }).then(null, done);
         resolution.reject();
+    });
+
+    QUnit.test("On error", function(assert) {
+        assert.expect(1);
+        var done = assert.async();
+        var actions = $.LastAction(null, function(){
+            assert.ok(true, 'On error callback');
+        });
+        var resolution = $.Deferred()
+        actions.push(function() {
+            return resolution;
+        }).then(null, done);
+        resolution.reject();
+    });
+
+    QUnit.test("On complete", function(assert) {
+        assert.expect(1);
+        var done = assert.async();
+        var actions = $.LastAction(function(){
+            assert.ok(true, 'On complete callback');
+        });
+        var resolution = $.Deferred()
+        actions.push(function() {
+            return resolution;
+        }).then(done);
+        resolution.resolve();
     });
 
 
