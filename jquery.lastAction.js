@@ -196,5 +196,55 @@
         resolution.resolve();
     });
 
+    QUnit.test("Chained messages on success", function(assert) {
+        assert.expect(1);
+        var done = assert.async();
+        var actions = $.LastAction(function(){
+            assert.ok(true, 'On complete callback');
+        });
+        var resolution = $.Deferred()
+        actions.push(function() {
+            return resolution;
+        }).then(done);
+        resolution.resolve();
+    });
 
-})();
+    QUnit.test("Chained messages responses", function(assert) {
+        assert.expect(3);
+        var done = assert.async();
+        var actions = $.LastAction(function(response){
+            assert.strictEqual(response, 'ok2', 'Message ok2 gets through');
+            done();
+        });
+        var resolution = $.Deferred()
+        actions.push(function() {
+            return resolution;
+        });
+        actions.push(function(response) {
+            assert.strictEqual(response, 'ok', 'Message ok gets through');
+            return  $.Deferred().reject('fail').promise();
+        });
+        resolution.resolve('ok');
+        actions.push(function(response) {
+            assert.strictEqual(response, 'fail', 'Message fail gets through');
+            return  $.Deferred().resolve('ok2').promise();
+        });
+    });
+
+    QUnit.test("Chained messages responses 2", function(assert) {
+    assert.expect(2);
+    var done = assert.async();
+    var actions = $.LastAction(null, function(response){
+        assert.strictEqual(response, 'fail2', 'Message gets through');
+        done();
+    });
+    var resolution = $.Deferred()
+    actions.push(function() {
+        return resolution;
+    });
+    actions.push(function(response) {
+        assert.strictEqual(response, 'fail', 'Message ok gets through');
+        return  $.Deferred().reject('fail2').promise();
+    });
+    resolution.reject('fail');
+});
