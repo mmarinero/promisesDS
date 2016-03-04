@@ -68,11 +68,11 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             };
 
 
-            LruCons.prototype.set = function (key, promise) {
+            LruCons.prototype.set = function (_key, promise) {
                 promise.lru = 0;
             };
 
-            LruCons.prototype.get = function (key, promise) {
+            LruCons.prototype.get = function (_key, promise) {
                 this.counter += 1;
                 promise.lru = this.counter;
             };
@@ -85,7 +85,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             LruCons.prototype.evict = function (nEvicted) {
                 var cache = this.cache;
                 var evicted = evictionSort(cache._promises, nEvicted, 'lru');
-                $.each(evicted, function (key, obj) {
+                $.each(evicted, function (_key, obj) {
                     cache.remove(obj.propKey);
                 });
             };
@@ -105,11 +105,11 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 this.cache = cache;
             };
 
-            MruCons.prototype.set = function (key, promise) {
+            MruCons.prototype.set = function (_key, promise) {
                 promise.mru = 0;
             };
 
-            MruCons.prototype.get = function (key, promise) {
+            MruCons.prototype.get = function (_key, promise) {
                 this.counter += 1;
                 promise.mru = this.counter;
             };
@@ -121,7 +121,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             MruCons.prototype.evict = function (nEvicted) {
                 var cache = this.cache;
                 var evicted = evictionSort(cache._promises, nEvicted, 'mru', true);
-                $.each(evicted, function (key, obj) {
+                $.each(evicted, function (_key, obj) {
                     cache.remove(obj.propKey);
                 });
             };
@@ -140,11 +140,11 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 this.cache = cache;
             };
 
-            LfuCons.prototype.set = function (key, promise) {
+            LfuCons.prototype.set = function (_key, promise) {
                 promise.lfu = 0;
             };
 
-            LfuCons.prototype.get = function (key, promise) {
+            LfuCons.prototype.get = function (_key, promise) {
                 promise.lfu += 1;
             };
 
@@ -155,7 +155,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             LfuCons.prototype.evict = function (nEvicted) {
                 var cache = this.cache;
                 var evicted = evictionSort(cache._promises, nEvicted, 'lfu');
-                $.each(evicted, function (key, obj) {
+                $.each(evicted, function (_key, obj) {
                     cache.remove(obj.propKey);
                 });
             };
@@ -371,7 +371,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
     /**
      * Unit tests QUnit 1.15
      */
-    (function () {
+    (function ($) {
         "use strict";
         QUnit.module('Basic');
         QUnit.test("set/get", function (assert) {
@@ -420,7 +420,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
 
         QUnit.module('Settings');
         QUnit.test("capacity and evict initialization", function (assert) {
-            expect(3);
+            assert.expect(3);
             assert.throws(function () {
                 $.PromiseCache({}, {
                     capacity: 100
@@ -442,7 +442,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.test("discarded", function (assert) {
-            expect(5);
+            assert.expect(5);
             var dfr = $.Deferred();
             $.PromiseCache({
                 'first': dfr
@@ -471,7 +471,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.asyncTest("promise fail interception", function (assert) {
-            expect(6);
+            assert.expect(6);
             var dfr = $.Deferred();
             var dfr2 = $.Deferred().reject();
             var dfr3 = $.Deferred();
@@ -491,7 +491,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             cache.get('first').done(function () {
                 assert.ok(true, 'resolved');
                 cache.set('third', dfr3, {
-                    fail: function (dfr, key, promise) {
+                    fail: function () {
                         assert.ok(true, 'override fail ok');
                         QUnit.start();
                     }
@@ -507,13 +507,13 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.asyncTest("expireTime method", function (assert) {
-            expect(4);
+            assert.expect(4);
             var dfr = $.Deferred();
             var cache = $.PromiseCache({
                 'first': dfr
             }, {
                 expireTime: 1,
-                discarded: function (key, promise) {
+                discarded: function (key) {
                     assert.ok(true, key + ' expired');
                 }
             });
@@ -521,7 +521,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             var millis = Date.now();
             cache.set('third', dfr, {
                 expireTime: 10,
-                discarded: function (key) {
+                discarded: function () {
                     var elapsed = Date.now() - millis;
                     //8 for tolerance
                     assert.ok(elapsed > 8, 'third expireTime override expected >= 10, elapsed: ' + elapsed);
@@ -530,7 +530,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             });
             cache.set('fourth', dfr, {
                 expireTime: 5,
-                discarded: function (key) {
+                discarded: function () {
                     var elapsed = Date.now() - millis;
                     //8 for tolerance
                     assert.ok(elapsed < 8, 'fourth deleted before expire expected immediate removal, elapsed: ' + elapsed);
@@ -541,7 +541,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.test("eviction methods", function (assert) {
-            expect(5);
+            assert.expect(5);
             var dfr = $.Deferred();
             var cache = $.PromiseCache(null, {
                 eviction: {
@@ -595,7 +595,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         };
 
         var getSequence = function(cache, getsArray){
-          $.each(getsArray, function(i, key){
+          $.each(getsArray, function(_i, key){
             cache.get(key);
           });
         };
@@ -613,10 +613,10 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.test("LRU eviction", function (assert) {
-            expect(6);
+            assert.expect(6);
             var ch = testCache();
             var order = 0;
-            ch.options.discarded = function (key, promise) {
+            ch.options.discarded = function (key) {
                 switch (order) {
                     case 0:
                         assert.equal(key, 1, 'first evicted 1');
@@ -663,10 +663,10 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.test("MRU eviction", function (assert) {
-            expect(6);
+            assert.expect(6);
             var ch = testCache();
             var order = 0;
-            ch.options.discarded = function (key, promise) {
+            ch.options.discarded = function (key) {
                 switch (order) {
                     case 0:
                         assert.equal(key, 0, 'first evicted 1');
@@ -713,10 +713,10 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
         });
 
         QUnit.test("LFU eviction", function (assert) {
-            expect(6);
+            assert.expect(6);
             var ch = testCache();
             var order = 0;
-            ch.options.discarded = function (key, promise) {
+            ch.options.discarded = function (key) {
                 switch (order) {
                     case 0:
                         assert.equal(key, 1, 'first evicted 1');
@@ -752,7 +752,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             cache2.set(5, ch.promises[1]);
         });
 
-    })();
+    })(jQuery);
 
     jQuery(function() {
         QUnit.load();

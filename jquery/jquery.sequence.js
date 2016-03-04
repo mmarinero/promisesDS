@@ -233,6 +233,9 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             this.push(function (deferred) {
                 var result = action.apply(this, shiftArgs(arguments));
                 deferred.resolveWith(this, result);
+            }, function (deferred) {
+                var result = fallback.apply(this, shiftArgs(arguments));
+                deferred.resolveWith(this, result);
             });
             return this;
         };
@@ -365,7 +368,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             assert.expect(1);
             $.Sequence([function (deferred) {
                 deferred.resolve('message');
-            }, function (deferred, message) {
+            }, function (_deferred, message) {
                 assert.equal(message, 'message', 'correct message');
                 QUnit.start();
             }]);
@@ -393,7 +396,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             assert.expect(1);
             $.Sequence([function (deferred) {
                 deferred.reject();
-            }, function (deferred) {
+            }, function () {
                 assert.ok(false, 'Never called without fallback');
             }, {
                 action: function () {},
@@ -408,8 +411,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
 
         QUnit.asyncTest("return promise", function (assert) {
             assert.expect(1);
-            var order = false;
-            $.Sequence([function (deferred) {
+            $.Sequence([function () {
                 return $.Deferred().resolve();
             }]).promise().done(function () {
                 assert.ok(true, 'promise was chained');

@@ -150,7 +150,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
     /**
      * Unit tests QUnit 1.17
      */
-    (function() {
+    (function($) {
         "use strict";
 
         QUnit.test("lastPromise thenable", function(assert) {
@@ -161,7 +161,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 assert.ok(true, 'action chained');
                 done();
                 return $.Deferred();
-            })
+            });
         });
 
         QUnit.test("Rejected actions don't stop next action", function(assert) {
@@ -183,28 +183,28 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 assert.ok(true, 'chained action gets executed');
                 done();
                 return $.Deferred();
-            })
+            });
         });
 
         QUnit.test("Drop one request", function(assert) {
             assert.expect(1);
             var done = assert.async();
             var actions = $.LastAction();
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
-            })
+            });
 
             actions.push(function() {
                 assert.ok(false, 'This action should have been dropped');
                 return $.Deferred();
-            })
+            });
 
             actions.push(function() {
                 assert.ok(true, 'last action gets executed');
                 done();
                 return $.Deferred();
-            })
+            });
             resolution.resolve();
         });
 
@@ -212,7 +212,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             assert.expect(3);
             var done = assert.async();
             var actions = $.LastAction();
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 assert.ok(true, 'This action should be executed 3 times');
                 return resolution;
@@ -224,7 +224,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             assert.expect(2);
             var done = assert.async();
             var actions = $.LastAction(null, null, 1);
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 assert.ok(true, 'This action should be executed 2 times');
                 return resolution;
@@ -238,7 +238,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             var actions = $.LastAction(null, function(){
                 assert.ok(true, 'On error callback');
             });
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
             }).then(null, done);
@@ -251,7 +251,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             var actions = $.LastAction(function(){
                 assert.ok(true, 'On complete callback');
             });
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
             }).then(done);
@@ -264,7 +264,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             var actions = $.LastAction(function(){
                 assert.ok(true, 'On complete callback');
             });
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
             }).then(done);
@@ -278,7 +278,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 assert.strictEqual(response, 'ok2', 'Message ok2 gets through');
                 done();
             });
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
             });
@@ -300,7 +300,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
                 assert.strictEqual(response, 'fail2', 'Message gets through');
                 done();
             });
-            var resolution = $.Deferred()
+            var resolution = $.Deferred();
             actions.push(function() {
                 return resolution;
             });
@@ -311,7 +311,7 @@ define(['jquery', 'QUnit'], function(jQuery, QUnit) {
             resolution.reject('fail');
         });
 
-    })();
+    })(jQuery);
 
     jQuery(function() {
         QUnit.load();

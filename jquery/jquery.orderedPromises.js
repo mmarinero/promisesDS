@@ -1,4 +1,4 @@
-/*global require, define*/
+/*global require, define, QUnit*/
 require.config({
     paths: {
         'QUnit': 'http://code.jquery.com/qunit/qunit-1.22.0',
