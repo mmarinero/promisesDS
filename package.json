@@ -1,0 +1,28 @@
+{
+  "name": "promisesds",
+  "version": "1.0.0",
+  "description": "ES6 Promises data structures and utils",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mmarinero/promisesDS.git"
+  },
+  "keywords": [
+    "promise",
+    "es6"
+  ],
+  "author": "Mario Marinero <mariomarinero@gmail.com>",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/mmarinero/promisesDS/issues"
+  },
+  "homepage": "https://github.com/mmarinero/promisesDS#readme",
+  "devDependencies": {
+    "babel-core": "^6.7.2",
+    "babel-loader": "^6.2.4",
+    "webpack": "^1.12.14"
+  }
+}
