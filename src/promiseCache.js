@@ -1,4 +1,4 @@
-(function ($) {
+module.exports = function($) {
     "use strict";
 
     /**
@@ -348,4 +348,4 @@
     PromiseCacheCons.prototype.evict = function (nEvicted) {
         this.eviction.evict(nEvicted);
     };
-}(jQuery));
+};

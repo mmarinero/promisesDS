@@ -1,4 +1,5 @@
-(function ($) {
+
+module.exports = function($) {
     "use strict";
     /**
      * The orderedPromises object keeps an ordered list of promises for a single
@@ -139,4 +140,4 @@
             return this;
         }
     };
-}(jQuery));
+};

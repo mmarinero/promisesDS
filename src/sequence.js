@@ -1,4 +1,4 @@
-(function ($) {
+module.exports = function(window, $) {
     "use strict";
     /**
      * Abstracts a sequence of a asynchronous actions, the order of execution of the
@@ -299,4 +299,4 @@
     SequenceCons.prototype.promise = function () {
         return this.lastPromise;
     };
-})(jQuery);
+};

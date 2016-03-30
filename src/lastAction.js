@@ -1,4 +1,5 @@
-(function($) {
+
+module.exports = function($) {
     "use strict";
     /**
      * The LastAction object accepts actions (functions that return promises) only executing the last
@@ -127,4 +128,4 @@
             return this.lastAction;
         }
     };
-}(jQuery));
+};
