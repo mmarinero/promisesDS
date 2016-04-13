@@ -4,7 +4,7 @@ require("jsdom").env("", function(err, window) {
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	require('../src/lastAction')(jQuery);
+	var LastAction = require('../src/lastAction');
 	var QUnit = require('qunitjs');
 	var qunitTap = require('qunit-tap');
 	qunitTap(QUnit, console.log.bind(console));
@@ -16,7 +16,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("lastPromise thenable", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
-			var actions = $.LastAction();
+			var actions = new LastAction();
 			actions.push(function() {
 				assert.ok(true, 'action chained');
 				done();
@@ -27,7 +27,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("Rejected actions don't stop next action", function(assert) {
 			assert.expect(2);
 			var done = assert.async();
-			var actions = $.LastAction();
+			var actions = new LastAction();
 			var firstAction = actions.push(function() {
 				return $.Deferred().reject();
 			});
@@ -49,7 +49,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("Drop one request", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
-			var actions = $.LastAction();
+			var actions = new LastAction();
 			var resolution = $.Deferred();
 			actions.push(function() {
 				return resolution;
@@ -71,7 +71,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("With retry", function(assert) {
 			assert.expect(3);
 			var done = assert.async();
-			var actions = $.LastAction();
+			var actions = new LastAction();
 			var resolution = $.Deferred();
 			actions.push(function() {
 				assert.ok(true, 'This action should be executed 3 times');
@@ -83,7 +83,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("With retry on definition", function(assert) {
 			assert.expect(2);
 			var done = assert.async();
-			var actions = $.LastAction(null, null, 1);
+			var actions = new LastAction(null, null, 1);
 			var resolution = $.Deferred();
 			actions.push(function() {
 				assert.ok(true, 'This action should be executed 2 times');
@@ -95,7 +95,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("On error", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
-			var actions = $.LastAction(null, function() {
+			var actions = new LastAction(null, function() {
 				assert.ok(true, 'On error callback');
 			});
 			var resolution = $.Deferred();
@@ -108,7 +108,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("On complete", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
-			var actions = $.LastAction(function() {
+			var actions = new LastAction(function() {
 				assert.ok(true, 'On complete callback');
 			});
 			var resolution = $.Deferred();
@@ -121,7 +121,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("Chained messages on success", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
-			var actions = $.LastAction(function() {
+			var actions = new LastAction(function() {
 				assert.ok(true, 'On complete callback');
 			});
 			var resolution = $.Deferred();
@@ -134,7 +134,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("Chained messages responses", function(assert) {
 			assert.expect(3);
 			var done = assert.async();
-			var actions = $.LastAction(function(response) {
+			var actions = new LastAction(function(response) {
 				assert.strictEqual(response, 'ok2', 'Message ok2 gets through');
 				done();
 			});
@@ -156,7 +156,7 @@ require("jsdom").env("", function(err, window) {
 		QUnit.test("Chained messages responses 2", function(assert) {
 			assert.expect(2);
 			var done = assert.async();
-			var actions = $.LastAction(null, function(response) {
+			var actions = new LastAction(null, function(response) {
 				assert.strictEqual(response, 'fail2', 'Message gets through');
 				done();
 			});

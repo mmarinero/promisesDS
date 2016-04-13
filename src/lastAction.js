@@ -1,6 +1,8 @@
 
-module.exports = function($) {
+module.exports = function() {
     "use strict";
+
+	var noop = function(){};
     /**
      * The LastAction object accepts actions (functions that return promises) only executing the last
      * action available and dropping the rest. The object also waits for a executed action to complete before
@@ -15,17 +17,27 @@ module.exports = function($) {
      * @param  {Int}   retries             Number of retries for each action before failing, default: 0
      * @return {LastAction}                LastAction instance
      */
-    $.LastAction = function(onComplete, onError, retries) {
-        return new LastActionCons(onComplete, onError, retries);
-    };
-
-    var LastActionCons = function(onComplete, onError, retries) {
-        this.onError = onError || $.noop;
-        this.onComplete = onComplete || $.noop;
+    var LastAction = function(onComplete, onError, retries) {
+        this.onError = onError || noop;
+        this.onComplete = onComplete || noop;
         this.retries = retries || 0;
         this._deferred = null;
         this.lastAction = null;
     };
+
+	var deferred = function(){
+		var dfr;
+		var promise = new Promise(function(resolve, reject){
+			dfr = {
+				resolve: resolve,
+				reject: reject,
+				then: function(success, fail){
+					return promise.then(success, fail);
+				}};
+		});
+		dfr.promise = promise;
+		return dfr;
+	};
 
     /**
      * Function for DRY, takes an action response and cleans it's deferred
@@ -92,7 +104,7 @@ module.exports = function($) {
      */
     var push = function(self, action) {
         self.lastAction = action;
-        var dfr = $.Deferred();
+        var dfr = deferred();
         if (self._deferred) {
             self._deferred = dfr;
             return self._deferred.then(function(response) {
@@ -105,7 +117,7 @@ module.exports = function($) {
     };
 
 
-    LastActionCons.prototype = {
+    LastAction.prototype = {
         /**
          * Adds an action to be executed if no other action is added before the last one finishes
          * @param  {Function} action  Function that returns an action, receives a parameter from the lastPromise
@@ -115,9 +127,9 @@ module.exports = function($) {
          */
         push: function(action, retries) {
             retries = retries === undefined ? this.retries : retries;
-            var dfr = $.Deferred();
+            var dfr = deferred();
             retrier(this, action, retries, dfr);
-            return dfr.promise();
+            return dfr.promise;
         },
 
         /**
@@ -128,4 +140,6 @@ module.exports = function($) {
             return this.lastAction;
         }
     };
-};
+
+	return LastAction;
+}();
