@@ -1,5 +1,5 @@
 
-module.exports = function($) {
+module.exports = function() {
     "use strict";
     /**
      * The orderedPromises object keeps an ordered list of promises for a single
@@ -17,11 +17,8 @@ module.exports = function($) {
      *                          	discarded: @see orderedPromises.next();
      *                           }
      */
-    $.orderedPromises = function (promises, options) {
-        return new OrderedPromisesCons(promises, options);
-    };
 
-    var OrderedPromisesCons = function(promises, options){
+    var OrderedPromises = function(promises, options){
         var self = this;
         options = options || {};
         promises = promises || [];
@@ -29,7 +26,7 @@ module.exports = function($) {
         this.next(options.next, options.nextFail);
         this.last(options.last, options.lastFail);
         this.discarded(options.discarded);
-        $.each(promises, function(_i, promise){
+        promises.forEach(function(promise){
             self.push(promise);
         });
     };
@@ -62,7 +59,9 @@ module.exports = function($) {
         }
     }
 
-    OrderedPromisesCons.prototype = {
+	var noop = function(){};
+
+    OrderedPromises.prototype = {
         /**
          * Add a new promise to the list.
          * @param  {Promise} promise to add
@@ -96,8 +95,8 @@ module.exports = function($) {
          * @return {OrderedPromises} chainable return
          */
         last: function(handler, failure){
-            this._last = handler || $.noop;
-            this._lastFail = failure || $.noop;
+            this._last = handler || noop;
+            this._lastFail = failure || noop;
             return this;
         },
 
@@ -112,8 +111,8 @@ module.exports = function($) {
          * @return {OrderedPromises} chainable return
          */
         next: function(handler, failure){
-            this._next = handler || $.noop;
-            this._nextFail = failure || $.noop;
+            this._next = handler || noop;
+            this._nextFail = failure || noop;
             return this;
         },
 
@@ -123,7 +122,7 @@ module.exports = function($) {
          * @return {[]} array of promises
          */
         promises: function(){
-            return $.map(this._promises, function(obj){
+            return this._promises.map(function(obj){
                 return obj.promise;
             });
         },
@@ -136,8 +135,10 @@ module.exports = function($) {
          * @return {OrderedPromises} chainable return
          */
         discarded: function(handler){
-            this._discarded = handler || $.noop;
+            this._discarded = handler || noop;
             return this;
         }
     };
-};
+
+	return OrderedPromises;
+}();

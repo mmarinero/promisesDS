@@ -4,7 +4,7 @@ require("jsdom").env("", function(err, window) {
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	require('../src/orderedPromises')(jQuery);
+	var OrderedPromises = require('../src/orderedPromises');
 	var QUnit = require('qunitjs');
 	var qunitTap = require('qunit-tap');
 	qunitTap(QUnit, console.log.bind(console));
@@ -19,7 +19,7 @@ require("jsdom").env("", function(err, window) {
             var done2 = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
             var first = true;
-            $.orderedPromises(promises).next(function(_promise, val){
+			(new OrderedPromises(promises)).next(function(_promise, val){
                 if (first){
                     assert.equal(val, 'ok', 'next callback called');
                     first = false;
@@ -36,7 +36,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("last callback", function (assert) {
             var done = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
-            $.orderedPromises(promises).last(function(_promise, val){
+            (new OrderedPromises(promises)).last(function(_promise, val){
                 assert.equal(val, 'ok', 'last callback called');
                 done();
             });
@@ -46,7 +46,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("discarded callback", function (assert) {
             var done = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
-            $.orderedPromises(promises).discarded(function(promise){
+            (new OrderedPromises(promises)).discarded(function(promise){
                 assert.equal(promises[0], promise, 'discarded callback correct');
                 done();
             });
@@ -57,7 +57,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("push", function (assert) {
             var done = assert.async();
             var promise = $.Deferred();
-            $.orderedPromises().push(promise).next(function(_promise, val){
+            (new OrderedPromises()).push(promise).next(function(_promise, val){
                 assert.equal(val, 'ok', 'promise was pushed');
                 done();
             });
@@ -66,7 +66,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.test("promises", function (assert) {
             var pro = [$.Deferred(), $.Deferred()];
-            var res = $.orderedPromises(pro).promises();
+            var res = (new OrderedPromises(pro)).promises();
             assert.ok(pro.length === res.length &&
                 pro[0] === res[0] && pro[1] === res[1],
                 'promises method returns original promises');
@@ -78,7 +78,7 @@ require("jsdom").env("", function(err, window) {
             var done2 = assert.async();
             var done3 = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
-            $.orderedPromises(promises, {
+            new OrderedPromises(promises, {
                 discarded: function(promise){
                     assert.equal(promises[0], promise, 'discarded callback correct');
                     done();
@@ -103,7 +103,7 @@ require("jsdom").env("", function(err, window) {
             var done3 = assert.async();
             var promises = [$.Deferred(), $.Deferred(),
                  $.Deferred(), $.Deferred(), $.Deferred()];
-             $.orderedPromises(promises, {
+            new OrderedPromises(promises, {
                  discarded: function(promise){
                      if (promises[0] === promise){
                          assert.ok(true, 'discarded callback correct');
