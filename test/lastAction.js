@@ -33,7 +33,7 @@ require("jsdom").env("", function(err, window) {
 			});
 
 			firstAction.then(function() {
-				assert.ok(false, 'This action should have call the failure callback');
+				assert.ok(false, 'This action should have called the failure callback');
 				return $.Deferred();
 			}, function() {
 				assert.ok(true, 'failure handle executed');
@@ -41,8 +41,9 @@ require("jsdom").env("", function(err, window) {
 
 			actions.push(function() {
 				assert.ok(true, 'chained action gets executed');
+				return $.Deferred().resolve();
+			}).then(function(){
 				done();
-				return $.Deferred();
 			});
 		});
 
