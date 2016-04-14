@@ -4,7 +4,7 @@ require("jsdom").env("", function(err, window) {
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	require('../src/promiseCache')(jQuery);
+	var PromiseCache = require('../src/promiseCache');
 	var QUnit = require('qunitjs');
 	var qunitTap = require('qunit-tap');
 	qunitTap(QUnit, console.log.bind(console));
@@ -15,16 +15,16 @@ require("jsdom").env("", function(err, window) {
         QUnit.module('Basic');
         QUnit.test("set/get", function (assert) {
             var dfr = $.Deferred();
-            assert.equal($.PromiseCache({
+            assert.equal((new PromiseCache({
                 'first': dfr
-            }).get('first'), dfr, 'set -> get returns same promise');
-            assert.equal($.PromiseCache().get('first'), undefined, 'not set key get returns undefined');
+            })).get('first'), dfr, 'set -> get returns same promise');
+            assert.equal((new PromiseCache()).get('first'), undefined, 'not set key get returns undefined');
         });
 
         QUnit.test("change set promise", function (assert) {
             var dfr1 = $.Deferred();
             var dfr2 = $.Deferred();
-            var cache = $.PromiseCache({
+            var cache = new PromiseCache({
                 'first': dfr1
             });
             assert.strictEqual(cache.get('first'), dfr1, 'first promise match');
@@ -34,7 +34,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.test("remove", function (assert) {
             var dfr = $.Deferred();
-            var cache = $.PromiseCache({
+            var cache = new PromiseCache({
                 'first': dfr
             });
             assert.strictEqual(cache.remove('first'), dfr, 'remove returns promise');
@@ -50,7 +50,7 @@ require("jsdom").env("", function(err, window) {
                     'second': dfr2,
                     'third': dfr1
             };
-            var cache = $.PromiseCache(promises);
+            var cache = new PromiseCache(promises);
             var cached = cache.promises();
             assert.strictEqual(cached.first, promises.first, '1 promises method returns all promises in cache');
             assert.strictEqual(cached.second, promises.second, '2 promises method returns all promises in cache');
@@ -61,19 +61,19 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("capacity and evict initialization", function (assert) {
             assert.expect(3);
             assert.throws(function () {
-                $.PromiseCache({}, {
+                new PromiseCache({}, {
                     capacity: 100
                 }, Error, 'capacity requires eviction method');
             });
-            $.PromiseCache({}, {
+            (new PromiseCache({}, {
                 capacity: 100,
                 eviction: {
                     evict: function () {
                         assert.ok(true, 'evict called');
                     }
                 }
-            }).evict();
-            $.PromiseCache({}, {
+            })).evict();
+            new PromiseCache({}, {
                 capacity: 100,
                 eviction: 'lru'
             });
@@ -83,15 +83,15 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("discarded", function (assert) {
             assert.expect(5);
             var dfr = $.Deferred();
-            $.PromiseCache({
+            (new PromiseCache({
                 'first': dfr
             }, {
                 discarded: function (key, promise) {
                     assert.strictEqual(key, 'first', 'discarded key ok');
                     assert.strictEqual(promise, dfr, 'discarded promise ok');
                 }
-            }).remove('first');
-            var cache = $.PromiseCache(null, {
+            })).remove('first');
+            var cache = new PromiseCache(null, {
                 discarded: function () {
                     throw new Error('I should be overrided');
                 }
@@ -114,7 +114,7 @@ require("jsdom").env("", function(err, window) {
             var dfr = $.Deferred();
             var dfr2 = $.Deferred().reject();
             var dfr3 = $.Deferred();
-            var cache = $.PromiseCache({
+            var cache = new PromiseCache({
                 'first': dfr,
                     'second': dfr2
             }, {
@@ -127,7 +127,7 @@ require("jsdom").env("", function(err, window) {
                 }
             });
             dfr.reject();
-            cache.get('first').done(function () {
+            cache.get('first').then(function () {
                 assert.ok(true, 'resolved');
                 cache.set('third', dfr3, {
                     fail: function () {
@@ -136,10 +136,10 @@ require("jsdom").env("", function(err, window) {
                     }
                 });
                 dfr3.reject();
-            }).fail(function () {
+            }, function () {
                 assert.ok(false, 'never called');
             });
-            cache.get('second').done(function () {
+            cache.get('second').then(function () {
                 assert.ok(true, 'resolved');
             });
 
@@ -148,7 +148,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.asyncTest("expireTime method", function (assert) {
             assert.expect(4);
             var dfr = $.Deferred();
-            var cache = $.PromiseCache({
+            var cache = new PromiseCache({
                 'first': dfr
             }, {
                 expireTime: 1,
@@ -182,7 +182,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("eviction methods", function (assert) {
             assert.expect(5);
             var dfr = $.Deferred();
-            var cache = $.PromiseCache(null, {
+            var cache = new PromiseCache(null, {
                 eviction: {
                     init: function (cache, promises, options) {
                         var check = cache.get && options.eviction && promises === null;
@@ -243,7 +243,7 @@ require("jsdom").env("", function(err, window) {
             var ch = testCache();
             ch.options.eviction = 'lru';
             ch.options.capacity = 10;
-            var cache = $.PromiseCache(ch.promises, ch.options);
+            var cache = new PromiseCache(ch.promises, ch.options);
             assert.strictEqual(cache._promises[0].lru, 0, 'After set promise lru 0');
             cache.get(0);
             assert.strictEqual(cache._promises[0].lru, 1, 'After get promise lru 1');
@@ -272,7 +272,7 @@ require("jsdom").env("", function(err, window) {
                 }
             };
             ch.options.eviction = 'lru';
-            var cache = $.PromiseCache(null, ch.options);
+            var cache = new PromiseCache(null, ch.options);
             cache.set(0, ch.promises[0]);
             cache.set(1, ch.promises[1]);
             getSequence(cache, [0,1,0]);
@@ -286,7 +286,7 @@ require("jsdom").env("", function(err, window) {
             ch2.options.evictRate = 3;
             ch2.options.capacity = 4;
             ch2.options.eviction = 'lru';
-            var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+            var cache2 = new PromiseCache(ch2.promises, ch2.options);
             getSequence(cache2, [0,1,2,1,3,2,1,3,3]);
             cache2.set(5, ch.promises[1]);
         });
@@ -295,7 +295,7 @@ require("jsdom").env("", function(err, window) {
             var ch = testCache();
             ch.options.eviction = 'mru';
             ch.options.capacity = 10;
-            var cache = $.PromiseCache(ch.promises, ch.options);
+            var cache = new PromiseCache(ch.promises, ch.options);
             assert.strictEqual(cache._promises[0].mru, 0, 'After set promise mru 0');
             cache.get(0);
             assert.strictEqual(cache._promises[0].mru, 1, 'After get promise mru 1');
@@ -322,7 +322,7 @@ require("jsdom").env("", function(err, window) {
                 }
             };
             ch.options.eviction = 'mru';
-            var cache = $.PromiseCache(null, ch.options);
+            var cache = new PromiseCache(null, ch.options);
             cache.set(0, ch.promises[0]);
             cache.set(1, ch.promises[1]);
             getSequence(cache, [0,1,0]);
@@ -336,7 +336,7 @@ require("jsdom").env("", function(err, window) {
             ch2.options.evictRate = 3;
             ch2.options.capacity = 4;
             ch2.options.eviction = 'mru';
-            var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+            var cache2 = new PromiseCache(ch2.promises, ch2.options);
             getSequence(cache2, [1,2,0,2,3,0,1,3,3]);
             cache2.set(5, ch.promises[1]);
         });
@@ -345,7 +345,7 @@ require("jsdom").env("", function(err, window) {
             var ch = testCache();
             ch.options.eviction = 'lfu';
             ch.options.capacity = 10;
-            var cache = $.PromiseCache(ch.promises, ch.options);
+            var cache = new PromiseCache(ch.promises, ch.options);
             assert.strictEqual(cache._promises[0].lfu, 0, 'After set promise lfu 0');
             cache.get(0);
             assert.strictEqual(cache._promises[0].lfu, 1, 'After get promise lfu 1');
@@ -372,7 +372,7 @@ require("jsdom").env("", function(err, window) {
                 }
             };
             ch.options.eviction = 'lfu';
-            var cache = $.PromiseCache(null, ch.options);
+            var cache = new PromiseCache(null, ch.options);
             cache.set(0, ch.promises[0]);
             cache.set(1, ch.promises[1]);
             getSequence(cache, [0,1,0]);
@@ -386,7 +386,7 @@ require("jsdom").env("", function(err, window) {
             ch2.options.evictRate = 3;
             ch2.options.capacity = 4;
             ch2.options.eviction = 'lfu';
-            var cache2 = $.PromiseCache(ch2.promises, ch2.options);
+            var cache2 = new PromiseCache(ch2.promises, ch2.options);
             getSequence(cache2, [3,2,0,2,1,0,0,0,1,1]);
             cache2.set(5, ch.promises[1]);
         });

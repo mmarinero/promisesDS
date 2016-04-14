@@ -1,4 +1,4 @@
-module.exports = function($) {
+module.exports = function() {
     "use strict";
 
     /**
@@ -18,21 +18,23 @@ module.exports = function($) {
         }
         var evicted = [];
         var evictedSize = 0;
-        $.each(promises, function (key, promise) {
-            if (desc === (limit <= promise[prop]) || evictedSize < nEvicted) {
-                var i = 1;
-                var notFilled = i < nEvicted && !evicted[i];
-                while (notFilled || (evicted[i] && desc === (evicted[i][prop]) <= promise[prop])) {
-                    evicted[i - 1] = evicted[i];
-                    i += 1;
-                    notFilled = i < nEvicted && !evicted[i];
-                }
-                evicted[i - 1] = {propKey: key};
-                evicted[i - 1][prop] = promise[prop];
-                evictedSize += 1;
-                limit = evicted[0] ? evicted[0][prop] : limit;
-            }
-        });
+
+		Object.keys(promises).forEach(function(key){
+			var promise = promises[key];
+			if (desc === (limit <= promise[prop]) || evictedSize < nEvicted) {
+				var i = 1;
+				var notFilled = i < nEvicted && !evicted[i];
+				while (notFilled || (evicted[i] && desc === (evicted[i][prop]) <= promise[prop])) {
+					evicted[i - 1] = evicted[i];
+					i += 1;
+					notFilled = i < nEvicted && !evicted[i];
+				}
+				evicted[i - 1] = {propKey: key};
+				evicted[i - 1][prop] = promise[prop];
+				evictedSize += 1;
+				limit = evicted[0] ? evicted[0][prop] : limit;
+			}
+		});
         return evicted;
     };
 
@@ -67,9 +69,9 @@ module.exports = function($) {
         LruCons.prototype.evict = function (nEvicted) {
             var cache = this.cache;
             var evicted = evictionSort(cache._promises, nEvicted, 'lru');
-            $.each(evicted, function (_key, obj) {
-                cache.remove(obj.propKey);
-            });
+			Object.keys(evicted).forEach(function (key) {
+                cache.remove(evicted[key].propKey);
+			});
         };
         return LruCons;
     })();
@@ -103,8 +105,8 @@ module.exports = function($) {
         MruCons.prototype.evict = function (nEvicted) {
             var cache = this.cache;
             var evicted = evictionSort(cache._promises, nEvicted, 'mru', true);
-            $.each(evicted, function (_key, obj) {
-                cache.remove(obj.propKey);
+			Object.keys(evicted).forEach(function (key) {
+                cache.remove(evicted[key].propKey);
             });
         };
         return MruCons;
@@ -137,9 +139,9 @@ module.exports = function($) {
         LfuCons.prototype.evict = function (nEvicted) {
             var cache = this.cache;
             var evicted = evictionSort(cache._promises, nEvicted, 'lfu');
-            $.each(evicted, function (_key, obj) {
-                cache.remove(obj.propKey);
-            });
+			Object.keys(evicted).forEach(function (key) {
+				cache.remove(evicted[key].propKey);
+			});
         };
         return LfuCons;
     })();
@@ -153,6 +155,22 @@ module.exports = function($) {
         mru: Mru,
         lfu: Lfu
     };
+
+	var deferred = function(){
+		var dfr;
+		var promise = new Promise(function(resolve, reject){
+			dfr = {
+				resolve: resolve,
+				reject: reject,
+				then: function(success, fail){
+					return promise.then(success, fail);
+				}};
+		});
+		dfr.promise = promise;
+		return dfr;
+	};
+
+	var noop = function () {};
 
     /**
      * The promise cache is a small cache implementation for with some features
@@ -179,19 +197,7 @@ module.exports = function($) {
      *                              function @see PromiseCache::set
      *                         }
      */
-    $.PromiseCache = function (promises, options) {
-        return new PromiseCacheCons(promises, options);
-    };
-
-    var noop = function () {};
-
-    /**
-     * Constructor, initializes the cache and eviction, finally sets
-     * the initial set of promises
-     * @param {Object[key- > promise]} @see PromiseCache
-     * @param {Object} options @see PromiseCache
-     */
-    var PromiseCacheCons = function (promises, options) {
+    var PromiseCache = function (promises, options) {
         options = options || {};
         this._promises = {};
         this.length = 0;
@@ -222,9 +228,9 @@ module.exports = function($) {
         this.expireTime = options.expireTime;
         this.fail = options.fail;
         var self = this;
-        $.each(promises || {}, function (key, promise) {
-            self.set(key, promise, options);
-        });
+		Object.keys(promises || {}).forEach(function(key){
+			self.set(key, promises[key], options);
+		});
     };
 
     /**
@@ -249,7 +255,7 @@ module.exports = function($) {
      *                              for the getters.
      *                         }
      */
-    PromiseCacheCons.prototype.set = function (key, promise, options) {
+    PromiseCache.prototype.set = function (key, promise, options) {
         if (promise) options = options || {};
         var self = this;
         var interceptor;
@@ -265,14 +271,14 @@ module.exports = function($) {
         var fail = options.fail || this.fail;
         var promiseObj;
         if (fail) {
-            var dfr = $.Deferred();
-            interceptor = dfr.promise();
+            var dfr = deferred();
+            interceptor = dfr.promise;
             promiseObj = {
                 promise: interceptor
             };
             this._promises[key] = promiseObj;
             promise.then(function () {
-                dfr.resolveWith(this, arguments);
+                dfr.resolve(arguments);
             }, function () {
                 fail(dfr, key, promise);
             });
@@ -290,7 +296,7 @@ module.exports = function($) {
         this._promises[key].discarded = options.discarded || this.discarded || noop;
         var expireTime = options.expireTime !== undefined ? options.expireTime : this.expireTime;
         if (expireTime !== undefined) {
-            window.setTimeout(function () {
+            setTimeout(function () {
                 if (self._promises[key] && self._promises[key] === promiseObj) {
                     self.remove(key);
                 }
@@ -305,7 +311,7 @@ module.exports = function($) {
      * @param  {string} key cache entry to remove
      * @return {Promise|undefined} Removed promise or undefined it it doesn't exist
      */
-    PromiseCacheCons.prototype.remove = function (key) {
+    PromiseCache.prototype.remove = function (key) {
         var promise = this._promises[key];
         if (promise !== undefined) {
             delete this._promises[key];
@@ -321,7 +327,7 @@ module.exports = function($) {
      * @param  {string} key cache entry to retrieve
      * @return {Promise|undefined} Promise stored with the key or undefined if it doesn't exist
      */
-    PromiseCacheCons.prototype.get = function (key) {
+    PromiseCache.prototype.get = function (key) {
         if (this._promises[key]) {
             this.eviction.get(key, this._promises[key]);
             return this._promises[key].promise;
@@ -333,11 +339,12 @@ module.exports = function($) {
      *  copy of the internal promises store.
      * @return {Object} promises
      */
-    PromiseCacheCons.prototype.promises = function () {
+    PromiseCache.prototype.promises = function () {
         var cleanCopy = {};
-        $.each(this._promises, function (key, promise) {
-            cleanCopy[key] = promise.promise;
-        });
+		var promises = this._promises;
+		Object.keys(promises).forEach(function(key){
+			cleanCopy[key] = promises[key].promise;
+		});
         return cleanCopy;
     };
 
@@ -345,7 +352,9 @@ module.exports = function($) {
      * Will remove nEvicted promises from the cache or all if larger than the number of promises
      * @param  {int} nEvicted number of cache entries to clear
      */
-    PromiseCacheCons.prototype.evict = function (nEvicted) {
+    PromiseCache.prototype.evict = function (nEvicted) {
         this.eviction.evict(nEvicted);
     };
-};
+
+	return PromiseCache;
+}();
