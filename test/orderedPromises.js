@@ -12,21 +12,17 @@ require("jsdom").env("", function(err, window) {
 
     (function ($, QUnit) {
         "use strict";
-
-
         QUnit.test("next callback", function (assert) {
             var done = assert.async();
-            var done2 = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
             var first = true;
 			(new OrderedPromises(promises)).next(function(_promise, val){
                 if (first){
                     assert.equal(val, 'ok', 'next callback called');
                     first = false;
-                    done();
                 } else {
                     assert.equal(val, 'ok2', 'next callback called');
-                    done2();
+                    done();
                 }
             });
             promises[0].resolve('ok');
@@ -75,21 +71,17 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("config methods", function (assert) {
             assert.expect(3);
             var done = assert.async();
-            var done2 = assert.async();
-            var done3 = assert.async();
             var promises = [$.Deferred(), $.Deferred()];
             new OrderedPromises(promises, {
                 discarded: function(promise){
                     assert.equal(promises[0], promise, 'discarded callback correct');
-                    done();
                 },
                 next: function(_promise, val){
                     assert.equal(val, 'ok', 'next callback called');
-                    done2();
                 },
                 last: function(_promise, val){
                     assert.equal(val, 'ok', 'last callback called');
-                    done3();
+                    done();
                 }
             });
             promises[1].resolve('ok');
@@ -99,26 +91,22 @@ require("jsdom").env("", function(err, window) {
         QUnit.test("long sequence", function (assert) {
             assert.expect(3);
             var done = assert.async();
-            var done2 = assert.async();
-            var done3 = assert.async();
             var promises = [$.Deferred(), $.Deferred(),
                  $.Deferred(), $.Deferred(), $.Deferred()];
             new OrderedPromises(promises, {
                  discarded: function(promise){
                      if (promises[0] === promise){
                          assert.ok(true, 'discarded callback correct');
-                         done();
                      }
                  },
                  next: function(promise){
                      if (promise === promises[1]){
                          assert.ok(true, 'next callback called');
-                         done2();
                      }
                  },
                  last: function(_promise, val){
                      assert.equal(val, 'last', 'last callback called');
-                     done3();
+                     done();
                  }
              });
              promises[1].resolve('ok');
