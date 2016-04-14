@@ -4,7 +4,7 @@ require("jsdom").env("", function(err, window) {
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	require('../src/sequence')(window, jQuery);
+	var Sequence = require('../src/sequence');
 	var QUnit = require('qunitjs');
 	var qunitTap = require('qunit-tap');
 	qunitTap(QUnit, console.log.bind(console));
@@ -16,11 +16,11 @@ require("jsdom").env("", function(err, window) {
         QUnit.asyncTest("action", function (assert) {
             assert.expect(2);
             var order = false;
-            $.Sequence([function (deferred) {
+            (new Sequence([function (deferred) {
                 assert.ok($.isFunction(deferred.resolve), 'deferred object can be resolved');
                 order = true;
                 deferred.resolve();
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 assert.ok(order, 'action was performed in the correct order');
                 QUnit.start();
             });
@@ -28,7 +28,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("message", function (assert) {
             assert.expect(1);
-            $.Sequence([function (deferred) {
+            new Sequence([function (deferred) {
                 deferred.resolve('message');
             }, function (_deferred, message) {
                 assert.equal(message, 'message', 'correct message');
@@ -38,7 +38,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("fallback", function (assert) {
             assert.expect(2);
-            $.Sequence([function (deferred) {
+            (new Sequence([function (deferred) {
                 deferred.reject('message');
             }, {
                 action: function () {
@@ -48,7 +48,7 @@ require("jsdom").env("", function(err, window) {
                     assert.equal(message, 'message', 'fallback was called after reject with message');
                     deferred.resolve();
                 }
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 assert.ok(true, 'fallback recovered the action');
                 QUnit.start();
             });
@@ -56,7 +56,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("cascade rejects", function (assert) {
             assert.expect(1);
-            $.Sequence([function (deferred) {
+            (new Sequence([function (deferred) {
                 deferred.reject();
             }, function () {
                 assert.ok(false, 'Never called without fallback');
@@ -65,7 +65,7 @@ require("jsdom").env("", function(err, window) {
                 fallback: function (deferred) {
                     deferred.resolve();
                 }
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 assert.ok(true, 'fallback recovered the action');
                 QUnit.start();
             });
@@ -73,9 +73,9 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("return promise", function (assert) {
             assert.expect(1);
-            $.Sequence([function () {
-                return $.Deferred().resolve();
-            }]).promise().done(function () {
+            (new Sequence([function () {
+                return Promise.resolve();
+            }])).promise().then(function () {
                 assert.ok(true, 'promise was chained');
                 QUnit.start();
             });
@@ -84,7 +84,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.asyncTest("check async with timeouts", function (assert) {
             assert.expect(3);
             var order = 0;
-            $.Sequence([function (deferred) {
+            (new Sequence([function (deferred) {
                 window.setTimeout(function () {
                     assert.equal(order, 1, 'second');
                     order += 1;
@@ -97,7 +97,7 @@ require("jsdom").env("", function(err, window) {
                     assert.equal(order, 2, 'third');
                     deferred.resolve();
                 }, 0);
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 QUnit.start();
             });
         });
@@ -105,7 +105,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.asyncTest("check async with timeouts", function (assert) {
             assert.expect(3);
             var order = 0;
-            $.Sequence([function (deferred) {
+            (new Sequence([function (deferred) {
                 window.setTimeout(function () {
                     assert.equal(order, 1, 'second');
                     order += 1;
@@ -118,16 +118,16 @@ require("jsdom").env("", function(err, window) {
                     assert.equal(order, 2, 'third');
                     deferred.resolve();
                 }, 0);
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 QUnit.start();
             });
         });
 
         QUnit.asyncTest("push promise", function (assert) {
             assert.expect(1);
-            $.Sequence([{
-                promise: $.Deferred().resolve().promise()
-            }]).promise().done(function () {
+            (new Sequence([{
+                promise: Promise.resolve()
+            }])).promise().then(function () {
                 assert.ok(true, 'Promise resolved');
                 QUnit.start();
             });
@@ -135,7 +135,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("timeout fired", function (assert) {
             assert.expect(1);
-            $.Sequence([{
+            (new Sequence([{
                 promise: $.Deferred().promise()
             }, {
                 timeout: function (deferred) {
@@ -143,7 +143,7 @@ require("jsdom").env("", function(err, window) {
                     deferred.resolve();
                 },
                 duration: 4
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 QUnit.start();
             });
         });
@@ -151,7 +151,7 @@ require("jsdom").env("", function(err, window) {
         QUnit.asyncTest("timeout doesn't fire", function (assert) {
             assert.expect(1);
             var dfr = $.Deferred();
-            $.Sequence([{
+            new Sequence([{
                 promise: dfr.promise()
             }, {
                 timeout: function () {
@@ -169,11 +169,11 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("synchronous", function (assert) {
             assert.expect(1);
-            $.Sequence([{
+            (new Sequence([{
                 synchronous: function () {
                     assert.ok(true, 'function was executed');
                 }
-            }]).promise().done(function () {
+            }])).promise().then(function () {
                 QUnit.start();
             });
         });
@@ -182,7 +182,7 @@ require("jsdom").env("", function(err, window) {
             assert.expect(1);
             var dfr = $.Deferred();
             var order = false;
-            $.Sequence([{
+            new Sequence([{
                 promise: dfr.promise()
             }, {
                 whenEmpty: function () {
@@ -196,25 +196,9 @@ require("jsdom").env("", function(err, window) {
             dfr.resolve();
         });
 
-        QUnit.asyncTest("when empty in order", function (assert) {
-            assert.expect(1);
-            var order = false;
-            $.Sequence([{
-                promise: $.Deferred().resolve()
-            }, {
-                whenEmpty: function (deferred) {
-                    order = true;
-                    deferred.resolve();
-                }
-            }, function () {
-                assert.ok(order, 'after when empty');
-                QUnit.start();
-            }]);
-        });
-
         QUnit.asyncTest("when empty action return", function (assert) {
             assert.expect(1);
-            $.Sequence([{ whenEmpty: function () {
+            new Sequence([{ whenEmpty: function () {
                     var dfr = $.Deferred();
                     window.setTimeout(function () {
                         dfr.resolve();
@@ -231,7 +215,7 @@ require("jsdom").env("", function(err, window) {
 
         QUnit.asyncTest("push object", function (assert) {
             assert.expect(1);
-            $.Sequence().pushObject({
+            (new Sequence().pushObject({
                 action: function (deferred) {
                     assert.ok(true, 'action executed');
                     deferred.resolve();
@@ -239,14 +223,14 @@ require("jsdom").env("", function(err, window) {
                 fallback: function () {
                     assert.ok(false, 'initial action never calls the fallback');
                 }
-            }).promise().done(function () {
+            })).promise().then(function () {
                 QUnit.start();
             });
         });
 
         QUnit.asyncTest("chain", function (assert) {
             assert.expect(3);
-            var seq = $.Sequence().push(function (deferred) {
+            var seq = (new Sequence()).push(function (deferred) {
                 deferred.resolve();
             }).pushPromise($.Deferred().resolve()).pushSynchronous(function () {
                 assert.ok(true, 'executed');
@@ -255,8 +239,8 @@ require("jsdom").env("", function(err, window) {
             }).setTimeout(function (deferred) {
                 deferred.reject('I failed');
             });
-            seq.promise().fail(function (message) {
-                assert.ok(true, 'chain completed' + message);
+            seq.promise().then(null, function (message) {
+                assert.ok(true, 'chain completed: ' + message);
                 QUnit.start();
             });
         });

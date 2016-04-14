@@ -1,4 +1,4 @@
-module.exports = function(window, $) {
+module.exports = function() {
     "use strict";
     /**
      * Abstracts a sequence of a asynchronous actions, the order of execution of the
@@ -32,8 +32,31 @@ module.exports = function(window, $) {
      *         {whenEmpty, fallback}: action to execute when the sequence has no
      *             pending actionsto execute.
      */
-    $.Sequence = function (actions) {
-        return new SequenceCons(actions);
+    var Sequence = function (actions) {
+         var self = this;
+         this.lastPromise = Promise.resolve();
+         if (Array.isArray(actions)) {
+             actions.forEach(function (action) {
+                 self.pushObject(action);
+             });
+         } else if (actions !== undefined) {
+             throw new Error('actions (if passed) must be an array');
+         }
+     };
+
+    var deferred = function() {
+        var dfr;
+        var promise = new Promise(function(resolve, reject) {
+            dfr = {
+                resolve: resolve,
+                reject: reject,
+                then: function(success, fail) {
+                    return promise.then(success, fail);
+                }
+            };
+        });
+        dfr.promise = promise;
+        return dfr;
     };
 
     /**
@@ -60,31 +83,12 @@ module.exports = function(window, $) {
     };
 
     /**
-     * Constructor for the sequence
-     * @param {actions} actions @see $.Sequence(actions)
-     * @throws {Error} if actions is not an array or pushObject throws for one of the
-     *         actions
-     */
-    var SequenceCons = function (actions) {
-        var self = this;
-        var firstDeferred = $.Deferred().resolve();
-        this.lastPromise = firstDeferred.promise();
-        if ($.isArray(actions)) {
-            $.each(actions, function (_i, action) {
-                self.pushObject(action);
-            });
-        } else if (actions !== undefined) {
-            throw new Error('actions (if passed) must be an array');
-        }
-    };
-
-    /**
-     * Adds an action with object syntax @see $.Sequence(actions)
+     * Adds an action with object syntax @see Sequence(actions)
      * @param  {Object} obj action or feature to add to the sequence
      * @return {Sequence}     current instance to allow chaining
      */
-    SequenceCons.prototype.pushObject = function (obj) {
-        if ($.isFunction(obj)) {
+    Sequence.prototype.pushObject = function (obj) {
+        if (obj && obj.call) {
             this.push(obj);
         } else if (obj.action) {
             this.push(obj.action, obj.fallback);
@@ -111,11 +115,11 @@ module.exports = function(window, $) {
      * @param  {Deferred} target deferred linked to the origin promise
      */
     var pipeResolve = function (origin, target) {
-        if (origin && $.isFunction(origin.then)) {
+        if (origin && origin.then && origin.then.call) {
             origin.then(function () {
-                target.resolveWith(this, arguments);
+                target.resolve(arguments);
             }, function () {
-                target.rejectWith(this, arguments);
+                target.reject(arguments);
             });
         }
     };
@@ -145,22 +149,22 @@ module.exports = function(window, $) {
      *         parameter deferred
      * @return {Sequence}          current instance to allow chaining
      */
-    SequenceCons.prototype.push = function (action, fallback) {
-        var nextDeferred = $.Deferred();
+    Sequence.prototype.push = function (action, fallback) {
+        var nextDeferred = deferred();
         var oldPromise = this.lastPromise;
-        this.lastPromise = nextDeferred.promise();
-        oldPromise.done(function () {
+        this.lastPromise = nextDeferred.promise;
+        oldPromise.then(function () {
             var result = action.apply(this, unshiftArgs(arguments, nextDeferred));
             pipeResolve(result, nextDeferred);
         });
         if (fallback) {
-            oldPromise.fail(function () {
+            oldPromise.then(null, function () {
                 var result = fallback.apply(this, unshiftArgs(arguments, nextDeferred));
                 pipeResolve(result, nextDeferred);
             });
         } else {
-            oldPromise.fail(function () {
-                nextDeferred.rejectWith(this, arguments);
+            oldPromise.then(null, function () {
+                nextDeferred.reject(arguments);
             });
         }
         return this;
@@ -174,20 +178,19 @@ module.exports = function(window, $) {
      * @param  {Promise} promise Promise to introduce in the sequence
      * @return {Sequence}         current instance to allow chaining
      */
-    SequenceCons.prototype.pushPromise = function (promise) {
+    Sequence.prototype.pushPromise = function (promise) {
         var oldPromise = this.lastPromise;
         this.push(function (deferred) {
             oldPromise.then(function () {
                 promise.then(function () {
-                    deferred.resolveWith(this, arguments);
+                    deferred.resolve(arguments);
                 }, function () {
-                    deferred.rejectWith(this, arguments);
+                    deferred.reject(arguments);
                 });
             }, function () {
-                var self = this;
                 var args = arguments;
                 promise.always(function () {
-                    deferred.rejectWith(self, args);
+                    deferred.reject(args);
                 });
             });
         });
@@ -211,13 +214,13 @@ module.exports = function(window, $) {
      *         result: optional return value sent to the next action
      * @return {Sequence}          current instance to allow chaining
      */
-    SequenceCons.prototype.pushSynchronous = function (action, fallback) {
+    Sequence.prototype.pushSynchronous = function (action, fallback) {
         this.push(function (deferred) {
             var result = action.apply(this, shiftArgs(arguments));
-            deferred.resolveWith(this, result);
+            deferred.resolve(result);
         }, function (deferred) {
             var result = fallback.apply(this, shiftArgs(arguments));
-            deferred.resolveWith(this, result);
+            deferred.resolve(result);
         });
         return this;
     };
@@ -235,25 +238,25 @@ module.exports = function(window, $) {
      *                             the timeout handler
      * @return {Sequence}          current instance to allow chaining
      */
-    SequenceCons.prototype.setTimeout = function (handler, duration) {
-        var timeoutDfr = $.Deferred();
+    Sequence.prototype.setTimeout = function (handler, duration) {
+        var timeoutDfr = deferred();
         var timeoutFired = false;
-        var id = window.setTimeout(function () {
+        var id = setTimeout(function () {
             timeoutFired = true;
             var result = handler(timeoutDfr);
             pipeResolve(result, timeoutDfr);
         }, duration);
         var oldPromise = this.lastPromise;
-        this.lastPromise = timeoutDfr.promise();
+        this.lastPromise = timeoutDfr.promise;
         var pipeDfr = function (method) {
             return function () {
                 if (!timeoutFired) {
-                    window.clearTimeout(id);
+                    clearTimeout(id);
                     method(this, arguments);
                 }
             };
         };
-        oldPromise.then(pipeDfr(timeoutDfr.resolveWith), pipeDfr(timeoutDfr.rejectWith));
+        oldPromise.then(pipeDfr(timeoutDfr.resolve), pipeDfr(timeoutDfr.reject));
         return this;
     };
 
@@ -271,14 +274,14 @@ module.exports = function(window, $) {
      *                             @see Sequence.push() fallback parameter
      * @return {Sequence}          current instance to allow chaining
      */
-    SequenceCons.prototype.whenEmpty = function (action, fallback) {
+    Sequence.prototype.whenEmpty = function (action, fallback) {
         var currentPromise = this.lastPromise;
         var self = this;
         var pipeActions = function (func) {
             return function () {
                 if (self.lastPromise === currentPromise) {
-                    var nextDeferred = $.Deferred();
-                    self.lastPromise = nextDeferred.promise();
+                    var nextDeferred = deferred();
+                    self.lastPromise = nextDeferred.promise;
                     var result = func.apply(this, unshiftArgs(arguments, nextDeferred));
                     pipeResolve(result, nextDeferred);
                 } else {
@@ -296,7 +299,9 @@ module.exports = function(window, $) {
      * in the sequence.
      * @return {Promise} promise of the last action in the sequence
      */
-    SequenceCons.prototype.promise = function () {
+    Sequence.prototype.promise = function () {
         return this.lastPromise;
     };
-};
+
+    return Sequence;
+}();
