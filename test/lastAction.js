@@ -13,7 +13,7 @@ require("jsdom").env("", function(err, window) {
 	(function($, QUnit) {
 		"use strict";
 
-		QUnit.test("lastPromise thenable", function(assert) {
+		QUnit.test("Push method", function(assert) {
 			assert.expect(1);
 			var done = assert.async();
 			var actions = new LastAction();

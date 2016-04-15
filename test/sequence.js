@@ -85,7 +85,7 @@ require("jsdom").env("", function(err, window) {
 			assert.expect(3);
 			var order = 0;
 			(new Sequence([function (deferred) {
-				window.setTimeout(function () {
+				setTimeout(function () {
 					assert.equal(order, 1, 'second');
 					order += 1;
 					deferred.resolve();
@@ -93,7 +93,7 @@ require("jsdom").env("", function(err, window) {
 				assert.equal(order, 0, 'first');
 				order += 1;
 			}, function (deferred) {
-				window.setTimeout(function () {
+				setTimeout(function () {
 					assert.equal(order, 2, 'third');
 					deferred.resolve();
 				}, 0);
@@ -106,7 +106,7 @@ require("jsdom").env("", function(err, window) {
 			assert.expect(3);
 			var order = 0;
 			(new Sequence([function (deferred) {
-				window.setTimeout(function () {
+				setTimeout(function () {
 					assert.equal(order, 1, 'second');
 					order += 1;
 					deferred.resolve();
@@ -114,7 +114,7 @@ require("jsdom").env("", function(err, window) {
 				assert.equal(order, 0, 'first');
 				order += 1;
 			}, function (deferred) {
-				window.setTimeout(function () {
+				setTimeout(function () {
 					assert.equal(order, 2, 'third');
 					deferred.resolve();
 				}, 0);
@@ -162,7 +162,7 @@ require("jsdom").env("", function(err, window) {
 				assert.ok(true, 'next action was executed');
 			}]);
 			dfr.resolve();
-			window.setTimeout(function () {
+			setTimeout(function () {
 				QUnit.start();
 			}, 20);
 		});
