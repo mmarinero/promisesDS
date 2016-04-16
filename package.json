@@ -4,7 +4,11 @@
   "description": "ES6 Promises data structures and utils",
   "main": "src/lastaction.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "prove -e 'node test/allTests.js' /t",
+	"testtap": "node test/allTests.js",
+	"build": "webpack src/app.js build/app.js",
+	"watch": "webpack --watch src/app.js build/app.js",
+	"release": "webpack -p src/app.js build/app.min.js"
   },
   "repository": {
     "type": "git",

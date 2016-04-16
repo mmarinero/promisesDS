@@ -177,7 +177,7 @@ module.exports = function() {
 	 * to manage promises as failure management and expire time.
 	 * It has an eviction interface that decouples the algorithm and offers LRU,
 	 * MRU and LFU implementations.
-	 * It's based on jQuery Deferred objects
+	 * The Deferred objects have a resolve and reject method that manages the underlying promise
 	 * @param {Object[key- > promise]} promises Initial set of promises to cache with the keys
 	 *                                   present in the object
 	 * @param {Object} options {

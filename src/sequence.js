@@ -10,6 +10,9 @@ module.exports = function() {
 	 * Actions consist of a function that receives a Deferred object as its first
 	 * parameter and the result of the previous action as the following parameters.
 	 *
+	 * A Deferred object consists of a resolve and reject methods that manage the underlying
+	 * promise
+	 *
 	 * Actions are pushed using the available methods or using an array when
 	 * the sequence is created.
 	 * For every push feature there is an object syntax using properties and a
