@@ -48,8 +48,8 @@ require("jsdom").env("", function(err, window) {
 			var dfr2 = $.Deferred();
 			var promises = {
 				'first': dfr1,
-					'second': dfr2,
-					'third': dfr1
+				'second': dfr2,
+				'third': dfr1
 			};
 			var cache = new PromiseCache(promises);
 			var cached = cache.promises();
@@ -117,7 +117,7 @@ require("jsdom").env("", function(err, window) {
 			var dfr3 = $.Deferred();
 			var cache = new PromiseCache({
 				'first': dfr,
-					'second': dfr2
+				'second': dfr2
 			}, {
 				fail: function (deferred, key, promise) {
 					assert.ok(true, 'fail called');

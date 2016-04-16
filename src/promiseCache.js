@@ -187,7 +187,7 @@ module.exports = function() {
 	 *                          capacity int: Cache max number of promises, it will call
 	 *                              evict when full
 	 *                          evictRate int: Number of promises to evict when the cache
-	 *                              is full, it may be more efficient if the eviction algorihm
+	 *                              is full, it may be more efficient if the eviction algorithm
 	 *                              is costly.
 	 *                          discarded function(key, promise): optional default function
 	 *                              @see PromiseCache::set
