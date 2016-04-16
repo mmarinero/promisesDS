@@ -2,7 +2,7 @@
   "name": "promisesds",
   "version": "1.0.0",
   "description": "ES6 Promises data structures and utils",
-  "main": "src/lastaction.js",
+  "main": "src/app.js",
   "scripts": {
     "test": "prove -e 'node test/allTests.js' /t",
 	"testtap": "node test/allTests.js",
