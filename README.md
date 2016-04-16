@@ -3,6 +3,8 @@ ES6 Promises data structures and utils
 
 Four classes implementing asynchronous utils using promises, all the methods are documented and the code is quite short. Here is a small description of each class and some examples, the examples are extracted from the tests that provide more use cases.
 
+They are written using ECMAScript 2015 Promises and some other features so es6 shim or corejs are needed to support older browsers but no transpilation is required.
+
 ## LastAction
 The LastAction object accepts actions (functions that return promises) only executing the last
 action available and dropping the rest. The object also waits for a executed action to complete before
