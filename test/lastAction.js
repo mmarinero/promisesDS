@@ -1,14 +1,13 @@
+var LastAction = require('../src/lastAction');
+var QUnit = require('qunitjs');
+QUnit.config.autorun = false;
+
 require("jsdom").env("", function(err, window) {
 	if (err) {
 		console.error(err);
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	var LastAction = require('../src/lastAction');
-	var QUnit = require('qunitjs');
-	var qunitTap = require('qunit-tap');
-	qunitTap(QUnit, console.log.bind(console));
-	QUnit.config.autorun = false;
 
 	(function($, QUnit) {
 		"use strict";
@@ -171,6 +170,12 @@ require("jsdom").env("", function(err, window) {
 			});
 			resolution.reject('fail');
 		});
-		QUnit.load();
+
+		if (require.main === module){
+			require('qunit-tap')(QUnit, console.log.bind(console));
+			QUnit.load();
+		}
 	})(jQuery, QUnit);
+
+
 });

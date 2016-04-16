@@ -1,14 +1,15 @@
+var PromiseCache = require('../src/promiseCache');
+var QUnit = require('qunitjs');
+QUnit.config.autorun = false;
+
+module.exports = QUnit;
+
 require("jsdom").env("", function(err, window) {
 	if (err) {
 		console.error(err);
 		return;
 	}
 	var jQuery = require("jquery")(window);
-	var PromiseCache = require('../src/promiseCache');
-	var QUnit = require('qunitjs');
-	var qunitTap = require('qunit-tap');
-	qunitTap(QUnit, console.log.bind(console));
-	QUnit.config.autorun = false;
 
 	(function ($, QUnit) {
 		"use strict";
@@ -390,6 +391,9 @@ require("jsdom").env("", function(err, window) {
 			getSequence(cache2, [3,2,0,2,1,0,0,0,1,1]);
 			cache2.set(5, ch.promises[1]);
 		});
-		QUnit.load();
+		if (require.main === module){
+			require('qunit-tap')(QUnit, console.log.bind(console));
+			QUnit.load();
+		}
 	})(jQuery, QUnit);
 });
