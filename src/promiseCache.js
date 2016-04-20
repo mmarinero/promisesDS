@@ -287,7 +287,7 @@ module.exports = function() {
 				promise: promise
 			};
 			this._promises[key] = promiseObj;
-			promise.fail(function () {
+			promise.then(null, function () {
 				if (self._promises[key] && self._promises[key] === promiseObj) {
 					this.remove(key);
 				}

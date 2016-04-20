@@ -24,6 +24,10 @@ module.exports = function() {
 		this.lastAction = null;
 	};
 
+	/**
+	 * Aux function to emulate jQuery deferred functionality
+	 * @return {Object} Object with resolve, reject, then methods and a promise property
+	 */
 	var deferred = function(){
 		var dfr;
 		var promise = new Promise(function(resolve, reject){
@@ -69,7 +73,7 @@ module.exports = function() {
 		return action().then(function(response) {
 			return resolver(self, response, dfr, self.onComplete);
 		}, function(response) {
-			return resolver(self, response, dfr, self.onError);
+			throw resolver(self, response, dfr, self.onError);
 		});
 	};
 
