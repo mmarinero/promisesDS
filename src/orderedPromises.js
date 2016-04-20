@@ -41,18 +41,16 @@ module.exports = function() {
 	 * @param  {arguments} argsObj args of the solved promise
 	 * @param  {boolean} success if the promise completed successfully
 	 */
-	function process(self, promises, promise, argsObj, success){
+	function process(self, promises, promise, value, success){
 		while (promises.length){
 			var current = promises.shift();
 			if(promise !== current.promise){
 				current.discarded = true;
 				self._discarded(current.promise);
 			} else {
-				var args = Array.prototype.slice.call(argsObj);
-				args.unshift(promise);
-				self[success ? '_next' : '_nextFail'].apply(self, args);
+				self[success ? '_next' : '_nextFail'](promise, value);
 				if (!promises.length){
-					self[success ? '_last' : '_lastFail'].apply(self, args);
+					self[success ? '_last' : '_lastFail'](promise, value);
 				}
 				return;
 			}
@@ -74,13 +72,13 @@ module.exports = function() {
 				discarded: false
 			};
 			this._promises.push(obj);
-			promise.then(function(){
+			promise.then(function(value){
 				if (!obj.discarded){
-					process(self, self._promises, obj.promise, arguments, true);
+					process(self, self._promises, obj.promise, value, true);
 				}
-			}, function(){
+			}, function(value){
 				if (!obj.discarded){
-					process(self, self._promises, obj.promise, arguments, false);
+					process(self, self._promises, obj.promise, value, false);
 				}
 			});
 			return this;

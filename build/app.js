@@ -83,15 +83,17 @@ var PromisesDS =
 			this.lastAction = null;
 		};
 
+		/**
+		 * Aux function to emulate jQuery deferred functionality
+		 * @return {Object} Object with resolve and reject methods and a promise property
+		 */
 		var deferred = function(){
 			var dfr;
 			var promise = new Promise(function(resolve, reject){
 				dfr = {
 					resolve: resolve,
-					reject: reject,
-					then: function(success, fail){
-						return promise.then(success, fail);
-					}};
+					reject: reject
+				};
 			});
 			dfr.promise = promise;
 			return dfr;
@@ -128,7 +130,7 @@ var PromisesDS =
 			return action().then(function(response) {
 				return resolver(self, response, dfr, self.onComplete);
 			}, function(response) {
-				return resolver(self, response, dfr, self.onError);
+				throw resolver(self, response, dfr, self.onError);
 			});
 		};
 
@@ -165,7 +167,7 @@ var PromisesDS =
 			var dfr = deferred();
 			if (self._deferred) {
 				self._deferred = dfr;
-				return self._deferred.then(function(response) {
+				return self._deferred.promise.then(function(response) {
 					return actionExecuter(self, action.bind(null, response), dfr);
 				});
 			} else {
@@ -250,18 +252,16 @@ var PromisesDS =
 		 * @param  {arguments} argsObj args of the solved promise
 		 * @param  {boolean} success if the promise completed successfully
 		 */
-		function process(self, promises, promise, argsObj, success){
+		function process(self, promises, promise, value, success){
 			while (promises.length){
 				var current = promises.shift();
 				if(promise !== current.promise){
 					current.discarded = true;
 					self._discarded(current.promise);
 				} else {
-					var args = Array.prototype.slice.call(argsObj);
-					args.unshift(promise);
-					self[success ? '_next' : '_nextFail'].apply(self, args);
+					self[success ? '_next' : '_nextFail'](promise, value);
 					if (!promises.length){
-						self[success ? '_last' : '_lastFail'].apply(self, args);
+						self[success ? '_last' : '_lastFail'](promise, value);
 					}
 					return;
 				}
@@ -283,13 +283,13 @@ var PromisesDS =
 					discarded: false
 				};
 				this._promises.push(obj);
-				promise.then(function(){
+				promise.then(function(value){
 					if (!obj.discarded){
-						process(self, self._promises, obj.promise, arguments, true);
+						process(self, self._promises, obj.promise, value, true);
 					}
-				}, function(){
+				}, function(value){
 					if (!obj.discarded){
-						process(self, self._promises, obj.promise, arguments, false);
+						process(self, self._promises, obj.promise, value, false);
 					}
 				});
 				return this;
@@ -515,15 +515,17 @@ var PromisesDS =
 			lfu: Lfu
 		};
 
+		/**
+		 * Aux function to emulate jQuery deferred functionality
+		 * @return {Object} Object with resolve and reject methods and a promise property
+		 */
 		var deferred = function(){
 			var dfr;
 			var promise = new Promise(function(resolve, reject){
 				dfr = {
 					resolve: resolve,
-					reject: reject,
-					then: function(success, fail){
-						return promise.then(success, fail);
-					}};
+					reject: reject
+				};
 			});
 			dfr.promise = promise;
 			return dfr;
@@ -546,7 +548,7 @@ var PromisesDS =
 		 *                          capacity int: Cache max number of promises, it will call
 		 *                              evict when full
 		 *                          evictRate int: Number of promises to evict when the cache
-		 *                              is full, it may be more efficient if the eviction algorihm
+		 *                              is full, it may be more efficient if the eviction algorithm
 		 *                              is costly.
 		 *                          discarded function(key, promise): optional default function
 		 *                              @see PromiseCache::set
@@ -636,8 +638,8 @@ var PromisesDS =
 					promise: interceptor
 				};
 				this._promises[key] = promiseObj;
-				promise.then(function () {
-					dfr.resolve(arguments);
+				promise.then(function (value) {
+					dfr.resolve(value);
 				}, function () {
 					fail(dfr, key, promise);
 				});
@@ -646,7 +648,7 @@ var PromisesDS =
 					promise: promise
 				};
 				this._promises[key] = promiseObj;
-				promise.fail(function () {
+				promise.then(null, function () {
 					if (self._promises[key] && self._promises[key] === promiseObj) {
 						this.remove(key);
 					}
@@ -772,42 +774,20 @@ var PromisesDS =
 			}
 		};
 
+		/**
+		 * Aux function to emulate jQuery deferred functionality
+		 * @return {Object} Object with resolve and reject methods and a promise property
+		 */
 		var deferred = function() {
 			var dfr;
 			var promise = new Promise(function(resolve, reject) {
 				dfr = {
 					resolve: resolve,
-					reject: reject,
-					then: function(success, fail) {
-						return promise.then(success, fail);
-					}
+					reject: reject
 				};
 			});
 			dfr.promise = promise;
 			return dfr;
-		};
-
-		/**
-		 * [private] Transforms an arguments 'array' into a proper array without the first element
-		 * @param  {arguments|array} argsObj arguments object or array
-		 * @return {array}         result array
-		 */
-		var shiftArgs = function (argsObj) {
-			var args = Array.prototype.slice.call(argsObj);
-			args.shift();
-			return args;
-		};
-
-		/**
-		 * [private] Transforms an arguments 'array' into a proper array with a new first element
-		 * @param  {arguments|array} argsObj arguments object or array
-		 * @param  {Any} parameter new element of the array
-		 * @return {[type]}          result array
-		 */
-		var unshiftArgs = function (argsObj, parameter) {
-			var args = Array.prototype.slice.call(argsObj);
-			args.unshift(parameter);
-			return args;
 		};
 
 		/**
@@ -844,10 +824,10 @@ var PromisesDS =
 		 */
 		var pipeResolve = function (origin, target) {
 			if (origin && origin.then && origin.then.call) {
-				origin.then(function () {
-					target.resolve(arguments);
-				}, function () {
-					target.reject(arguments);
+				origin.then(function (value) {
+					target.resolve(value);
+				}, function (value) {
+					target.reject(value);
 				});
 			}
 		};
@@ -881,18 +861,19 @@ var PromisesDS =
 			var nextDeferred = deferred();
 			var oldPromise = this.lastPromise;
 			this.lastPromise = nextDeferred.promise;
-			oldPromise.then(function () {
-				var result = action.apply(this, unshiftArgs(arguments, nextDeferred));
+			delete nextDeferred.promise;
+			oldPromise.then(function (value) {
+				var result = action(nextDeferred, value);
 				pipeResolve(result, nextDeferred);
 			});
 			if (fallback) {
-				oldPromise.then(null, function () {
-					var result = fallback.apply(this, unshiftArgs(arguments, nextDeferred));
+				oldPromise.then(null, function (value) {
+					var result = fallback(nextDeferred, value);
 					pipeResolve(result, nextDeferred);
 				});
 			} else {
-				oldPromise.then(null, function () {
-					nextDeferred.reject(arguments);
+				oldPromise.then(null, function (value) {
+					nextDeferred.reject(value);
 				});
 			}
 			return this;
@@ -910,15 +891,14 @@ var PromisesDS =
 			var oldPromise = this.lastPromise;
 			this.push(function (deferred) {
 				oldPromise.then(function () {
-					promise.then(function () {
-						deferred.resolve(arguments);
-					}, function () {
-						deferred.reject(arguments);
+					promise.then(function (value) {
+						deferred.resolve(value);
+					}, function (value) {
+						deferred.reject(value);
 					});
-				}, function () {
-					var args = arguments;
+				}, function (value) {
 					promise.always(function () {
-						deferred.reject(args);
+						deferred.reject(value);
 					});
 				});
 			});
@@ -943,11 +923,11 @@ var PromisesDS =
 		 * @return {Sequence}          current instance to allow chaining
 		 */
 		Sequence.prototype.pushSynchronous = function (action, fallback) {
-			this.push(function (deferred) {
-				var result = action.apply(this, shiftArgs(arguments));
+			this.push(function (deferred, value) {
+				var result = action(value);
 				deferred.resolve(result);
-			}, function (deferred) {
-				var result = fallback.apply(this, shiftArgs(arguments));
+			}, function (deferred, value) {
+				var result = fallback(value);
 				deferred.resolve(result);
 			});
 			return this;
@@ -977,10 +957,10 @@ var PromisesDS =
 			var oldPromise = this.lastPromise;
 			this.lastPromise = timeoutDfr.promise;
 			var pipeDfr = function (method) {
-				return function () {
+				return function (value) {
 					if (!timeoutFired) {
 						clearTimeout(id);
-						method(this, arguments);
+						method(value);
 					}
 				};
 			};
@@ -1006,11 +986,11 @@ var PromisesDS =
 			var currentPromise = this.lastPromise;
 			var self = this;
 			var pipeActions = function (func) {
-				return function () {
+				return function (value) {
 					if (self.lastPromise === currentPromise) {
 						var nextDeferred = deferred();
 						self.lastPromise = nextDeferred.promise;
-						var result = func.apply(this, unshiftArgs(arguments, nextDeferred));
+						var result = func(nextDeferred, value);
 						pipeResolve(result, nextDeferred);
 					} else {
 						currentPromise = self.lastPromise;

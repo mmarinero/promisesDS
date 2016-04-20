@@ -26,17 +26,15 @@ module.exports = function() {
 
 	/**
 	 * Aux function to emulate jQuery deferred functionality
-	 * @return {Object} Object with resolve, reject, then methods and a promise property
+	 * @return {Object} Object with resolve and reject methods and a promise property
 	 */
 	var deferred = function(){
 		var dfr;
 		var promise = new Promise(function(resolve, reject){
 			dfr = {
 				resolve: resolve,
-				reject: reject,
-				then: function(success, fail){
-					return promise.then(success, fail);
-				}};
+				reject: reject
+			};
 		});
 		dfr.promise = promise;
 		return dfr;
@@ -110,7 +108,7 @@ module.exports = function() {
 		var dfr = deferred();
 		if (self._deferred) {
 			self._deferred = dfr;
-			return self._deferred.then(function(response) {
+			return self._deferred.promise.then(function(response) {
 				return actionExecuter(self, action.bind(null, response), dfr);
 			});
 		} else {

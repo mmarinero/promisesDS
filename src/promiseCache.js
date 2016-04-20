@@ -156,15 +156,17 @@ module.exports = function() {
 		lfu: Lfu
 	};
 
+	/**
+	 * Aux function to emulate jQuery deferred functionality
+	 * @return {Object} Object with resolve and reject methods and a promise property
+	 */
 	var deferred = function(){
 		var dfr;
 		var promise = new Promise(function(resolve, reject){
 			dfr = {
 				resolve: resolve,
-				reject: reject,
-				then: function(success, fail){
-					return promise.then(success, fail);
-				}};
+				reject: reject
+			};
 		});
 		dfr.promise = promise;
 		return dfr;
@@ -277,8 +279,8 @@ module.exports = function() {
 				promise: interceptor
 			};
 			this._promises[key] = promiseObj;
-			promise.then(function () {
-				dfr.resolve(arguments);
+			promise.then(function (value) {
+				dfr.resolve(value);
 			}, function () {
 				fail(dfr, key, promise);
 			});
